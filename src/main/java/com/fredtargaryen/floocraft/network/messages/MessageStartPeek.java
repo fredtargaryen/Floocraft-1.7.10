@@ -2,7 +2,7 @@ package com.fredtargaryen.floocraft.network.messages;
 
 import com.fredtargaryen.floocraft.FloocraftBase;
 import io.netty.buffer.ByteBuf;
-import net.minecraftforge.fml.network.NetworkEvent;
+import net.minecraftforge.network.NetworkEvent;
 
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -10,8 +10,8 @@ import java.util.function.Supplier;
 public class MessageStartPeek {
     public UUID peekerUUID;
 
-    public void onMessage(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> FloocraftBase.proxy.onMessage(this));
+    public static void handle(MessageStartPeek message, Supplier<NetworkEvent.Context> ctx) {
+        ctx.get().enqueueWork(() -> FloocraftBase.proxy.onMessage(message));
         ctx.get().setPacketHandled(true);
     }
 

@@ -1,35 +1,37 @@
 package com.fredtargaryen.floocraft.block;
 
 import com.fredtargaryen.floocraft.FloocraftBase;
+import com.fredtargaryen.floocraft.blockentity.FlooSignBlockEntity;
 import com.fredtargaryen.floocraft.network.FloocraftWorldData;
-import com.fredtargaryen.floocraft.tileentity.FireplaceTileEntity;
-import net.minecraft.block.*;
-import net.minecraft.block.material.Material;
-import net.minecraft.item.Item;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.Direction;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.IBlockReader;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.WallSignBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.WoodType;
+import net.minecraft.world.level.material.Material;
 
 import javax.annotation.Nonnull;
 
-public class FlooSignBlock extends WallSignBlock {
+public class FlooSignBlock extends WallSignBlock implements EntityBlock {
 	public FlooSignBlock() {
-		super(Properties.create(Material.WOOD)
-                .doesNotBlockMovement()
-                .hardnessAndResistance(1.0F)
+		super(BlockBehaviour.Properties.of(Material.WOOD)
+                .noCollission()
+                .strength(1f)
                 .sound(SoundType.WOOD), WoodType.OAK);
-		this.setDefaultState(this.getStateContainer().getBaseState().with(FACING, Direction.NORTH).with(WATERLOGGED, false));
+		this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, false));
 	}
 
     @Override
-    public boolean hasTileEntity(BlockState state) { return true; }
-
-    @Override
-	public TileEntity createTileEntity(BlockState state, IBlockReader world) {
+	public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         try {
-            return new FireplaceTileEntity();
+            return new FlooSignBlockEntity();
         }
         catch (Exception exception) {
             throw new RuntimeException(exception);
@@ -42,27 +44,27 @@ public class FlooSignBlock extends WallSignBlock {
 
     @Override
     @Nonnull
-    public void onReplaced(BlockState state, World w, BlockPos pos, BlockState newState, boolean isMoving) {
-        if(!w.isRemote) {
-            FireplaceTileEntity tef = (FireplaceTileEntity) w.getTileEntity(pos);
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+        if(!level.isClientSide) {
+            FlooSignBlockEntity tef = (FlooSignBlockEntity) level.getBlockEntity(pos);
             if (tef != null && tef.getConnected()) {
                 //Finds the fireplace position from the sign position and rotation
                 //The block below the block at the top of the fireplace
-                BlockPos locationPos = pos.offset(state.get(FACING).getOpposite());
-                FloocraftWorldData.forWorld(w).removeLocation(locationPos.getX(), tef.getY(), locationPos.getZ());
+                BlockPos locationPos = pos.relative(state.getValue(FACING).getOpposite());
+                FloocraftWorldData.forLevel(level).removeLocation(locationPos.getX(), tef.getY(), locationPos.getZ());
             }
         }
-        super.onReplaced(state, w, pos, newState, isMoving);
+        super.onRemove(state, level, pos, newState, isMoving);
     }
 
     /**
-     * The type of render function called. MODEL for mixed tesr and static model, MODELBLOCK_ANIMATED for TESR-only,
+     * The type of render function called. MODEL for mixed BlockEntityRenderer and static model, MODELBLOCK_ANIMATED for BER-only,
      * LIQUID for vanilla liquids, INVISIBLE to skip all rendering
-     * @deprecated call via {@link BlockState#getRenderType()} whenever possible. Implementing/overriding is fine.
+     * @deprecated call via IBlockState#getRenderShape() whenever possible. Implementing/overriding is fine.
      */
     @Override
-    @Nonnull
-    public BlockRenderType getRenderType(BlockState state) {
-        return BlockRenderType.MODEL;
+    public RenderShape getRenderShape(BlockState state)
+    {
+        return RenderShape.MODEL;
     }
 }

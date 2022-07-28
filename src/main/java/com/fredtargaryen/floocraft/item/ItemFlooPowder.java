@@ -4,27 +4,25 @@ import com.fredtargaryen.floocraft.FloocraftBase;
 import com.fredtargaryen.floocraft.block.FlooFlamesBase;
 import com.fredtargaryen.floocraft.config.CommonConfig;
 import com.fredtargaryen.floocraft.entity.DroppedFlooPowderEntity;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.SoulFireBlock;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.client.util.ITooltipFlag;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroup;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ItemUseContext;
-import net.minecraft.state.properties.BlockStateProperties;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.util.ActionResultType;
-import net.minecraft.util.SoundCategory;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.vector.Vector3d;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TextFormatting;
-import net.minecraft.world.World;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
@@ -40,46 +38,45 @@ public class ItemFlooPowder extends Item {
     }
 
 	public ItemFlooPowder(byte conc) {
-		super(new Item.Properties().group(ItemGroup.MISC).maxStackSize(64));
+		super(new Item.Properties().tab(CreativeModeTab.TAB_MISC).stacksTo(64));
         this.concentration = conc;
 	}
 
     @Override
-	public ActionResultType onItemUse(ItemUseContext context) {
-        World worldIn = context.getWorld();
-        BlockPos pos = context.getPos();
-	    if(!worldIn.isRemote) {
-	        BlockState state = worldIn.getBlockState(pos);
+	public InteractionResult useOn(UseOnContext context) {
+        Level level = context.getLevel();
+        BlockPos pos = context.getClickedPos();
+	    if(!level.isClientSide) {
+	        BlockState state = level.getBlockState(pos);
 	        Block b = state.getBlock();
-	        if(b == Blocks.CAMPFIRE && state.get(BlockStateProperties.LIT))
+	        if(b == Blocks.CAMPFIRE && state.getValue(BlockStateProperties.LIT))
             {
-                worldIn.setBlockState(pos, FloocraftBase.FLOO_CAMPFIRE.get().getDefaultState()
-                        .with(BlockStateProperties.HORIZONTAL_FACING, state.get(BlockStateProperties.HORIZONTAL_FACING))
-                        .with(BlockStateProperties.AGE_0_15, (int) this.concentration), 3);
-                worldIn.playSound(null, pos, FloocraftBase.GREENED.get(), SoundCategory.BLOCKS, 1.0F, 1.0F);
-                context.getItem().grow(-1);
-                return ActionResultType.SUCCESS;
+                level.setBlock(pos, FloocraftBase.FLOO_CAMPFIRE.get().defaultBlockState()
+                        .setValue(BlockStateProperties.HORIZONTAL_FACING, state.getValue(BlockStateProperties.HORIZONTAL_FACING))
+                        .setValue(BlockStateProperties.AGE_15, (int) this.concentration), 3);
+                level.playSound(null, pos, FloocraftBase.GREENED.get(), SoundSource.BLOCKS, 1.0F, 1.0F);
+                context.getItemInHand().grow(-1);
+                return InteractionResult.SUCCESS;
             }
-            else if(b == Blocks.SOUL_CAMPFIRE && state.get(BlockStateProperties.LIT))
+            else if(b == Blocks.SOUL_CAMPFIRE && state.getValue(BlockStateProperties.LIT))
             {
-                worldIn.setBlockState(pos, FloocraftBase.FLOO_SOUL_CAMPFIRE.get().getDefaultState()
-                        .with(BlockStateProperties.HORIZONTAL_FACING, state.get(BlockStateProperties.HORIZONTAL_FACING))
-                        .with(BlockStateProperties.AGE_0_15, (int) this.concentration), 3);
-                worldIn.playSound(null, pos, FloocraftBase.GREENED.get(), SoundCategory.BLOCKS, 1.0F, 1.0F);
-                context.getItem().grow(-1);
-                return ActionResultType.SUCCESS;
+                level.setBlock(pos, FloocraftBase.FLOO_SOUL_CAMPFIRE.get().defaultBlockState()
+                        .setValue(BlockStateProperties.HORIZONTAL_FACING, state.getValue(BlockStateProperties.HORIZONTAL_FACING))
+                        .setValue(BlockStateProperties.AGE_15, (int) this.concentration), 3);
+                level.playSound(null, pos, FloocraftBase.GREENED.get(), SoundSource.BLOCKS, 1.0F, 1.0F);
+                context.getItemInHand().grow(-1);
+                return InteractionResult.SUCCESS;
             }
-            else if (b.isIn(BlockTags.FIRE)) {
-                if (((FlooFlamesBase) FloocraftBase.GREEN_FLAMES_TEMP.get()).isInFireplace(worldIn, pos) != null) {
-                    Block fireBlock = SoulFireBlock.shouldLightSoulFire(worldIn.getBlockState(pos.down()).getBlock()) ? FloocraftBase.MAGENTA_FLAMES_BUSY.get() : FloocraftBase.GREEN_FLAMES_BUSY.get();
-                    worldIn.setBlockState(pos, fireBlock.getDefaultState().with(BlockStateProperties.AGE_0_15, (int) this.concentration), 3);
-                    worldIn.playSound(null, pos, FloocraftBase.GREENED.get(), SoundCategory.BLOCKS, 1.0F, 1.0F);
+            else if (state.is(BlockTags.FIRE)) {
+                if (((FlooFlamesBase) FloocraftBase.GREEN_FLAMES_TEMP.get()).isInFireplace(level, pos) != null) {
+                    level.setBlock(pos, FlooFlamesBase.getFireBlockToPlace(level, pos).defaultBlockState().setValue(BlockStateProperties.AGE_15, (int) this.concentration), 3);
+                    level.playSound(null, pos, FloocraftBase.GREENED.get(), SoundSource.BLOCKS, 1.0F, 1.0F);
                 }
-                context.getItem().grow(-1);
-                return ActionResultType.SUCCESS;
+                context.getItemInHand().grow(-1);
+                return InteractionResult.SUCCESS;
             }
         }
-		return ActionResultType.FAIL;
+		return InteractionResult.FAIL;
 	}
 	
 	/**
@@ -87,19 +84,19 @@ public class ItemFlooPowder extends Item {
      * Returning null here will not kill the ItemEntity and will leave it to function normally.
      * Called when the item it placed in a world.
      *
-     * @param world The world object
+     * @param level The level object
      * @param location The ItemEntity object, useful for getting the position of the entity
      * @param itemstack The current item stack
      * @return A new Entity object to spawn or null
      */
 	@Override
-    public Entity createEntity(World world, Entity location, ItemStack itemstack) {
-        if(!world.isRemote) {
-            Vector3d pos = location.getPositionVec();
-            DroppedFlooPowderEntity flp = new DroppedFlooPowderEntity(world, pos.x, pos.y, pos.z, itemstack, this.concentration);
+    public Entity createEntity(Level level, Entity location, ItemStack itemstack) {
+        if(!level.isClientSide) {
+            Vec3 pos = location.position();
+            DroppedFlooPowderEntity flp = new DroppedFlooPowderEntity(level, pos.x, pos.y, pos.z, itemstack, this.concentration);
             //Set immune to fire in type;
-            flp.setPickupDelay(40);
-            flp.setMotion(location.getMotion());
+            flp.setPickUpDelay(40);
+            flp.setDeltaMovement(location.getDeltaMovement());
             return flp;
         }
         return null;
@@ -115,21 +112,21 @@ public class ItemFlooPowder extends Item {
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void addInformation(ItemStack stack, @Nullable World worldIn, List<ITextComponent> tooltip, ITooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flagIn) {
 		if(this.concentration == 9) {
-			tooltip.add(new StringTextComponent(I18n.format("item.floocraftft.concentration", '\u221E')).mergeStyle(TextFormatting.GREEN));
-            tooltip.add(new StringTextComponent(I18n.format("item.floocraftft.creativeonly")));
+			tooltip.add(new TranslatableComponent("item.floocraftft.concentration", '\u221E').withStyle(ChatFormatting.GREEN));
+            tooltip.add(new TranslatableComponent("item.floocraftft.creativeonly"));
 		}
 		else {
 		    if(CommonConfig.DEPLETE_FLOO.get()) {
-                tooltip.add(new StringTextComponent(I18n.format("item.floocraftft.concentration", this.concentration)).mergeStyle(TextFormatting.GREEN));
+                tooltip.add(new TranslatableComponent("item.floocraftft.concentration", this.concentration).withStyle(ChatFormatting.GREEN));
             }
 		    else
             {
-                tooltip.add(new StringTextComponent(I18n.format("item.floocraftft.concentration", '\u221E')).mergeStyle(TextFormatting.GREEN));
+                tooltip.add(new TranslatableComponent("item.floocraftft.concentration", '\u221E').withStyle(ChatFormatting.GREEN));
             }
         	if(this.concentration == 1) {
-                tooltip.add(new StringTextComponent(I18n.format("item.floocraftft.craftable")));
+                tooltip.add(new TranslatableComponent("item.floocraftft.craftable"));
 			}
         }
     }

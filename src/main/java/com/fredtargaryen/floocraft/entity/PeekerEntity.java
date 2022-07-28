@@ -5,13 +5,20 @@ import com.fredtargaryen.floocraft.network.MessageHandler;
 import com.fredtargaryen.floocraft.network.messages.MessageEndPeek;
 import com.fredtargaryen.floocraft.network.messages.MessagePlayerIDRequest;
 import net.minecraft.client.entity.player.AbstractClientPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.nbt.CompoundNBT;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.IPacket;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Direction;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.server.ServerWorld;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
@@ -29,8 +36,8 @@ public class PeekerEntity extends Entity {
     private ResourceLocation texture;
     private boolean sentRequest;
 
-    public PeekerEntity(World w) {
-        super(FloocraftBase.PEEKER_TYPE.get(), w);
+    public PeekerEntity(Level level) {
+        super(FloocraftBase.PEEKER_TYPE.get(), level);
         MinecraftForge.EVENT_BUS.register(this);
         this.texture = null;
         this.sentRequest = false;
@@ -40,8 +47,8 @@ public class PeekerEntity extends Entity {
         return this.playerUUID;
     }
 
-    public void setPeekerData(PlayerEntity player, BlockPos spawnPos, Direction direction) {
-        BlockPos landPos = spawnPos.offset(direction);
+    public void setPeekerData(Player player, BlockPos spawnPos, Direction direction) {
+        BlockPos landPos = spawnPos.relative(direction);
         float x = landPos.getX() + 0.5F;
         float y = landPos.getY();
         float z = landPos.getZ() + 0.5F;
@@ -92,8 +99,8 @@ public class PeekerEntity extends Entity {
      */
     @Override
     public void tick() {
-        if (!this.world.isRemote) {
-            PlayerEntity player = (PlayerEntity) ((ServerWorld)this.world).getEntityByUuid(this.playerUUID);
+        if (!this.level.isClientSide) {
+            Player player = (Player) ((ServerLevel)this.level).getEntityByUuid(this.playerUUID);
             if (player == null || !player.isAlive()) {
                 this.remove();
             }
@@ -102,7 +109,7 @@ public class PeekerEntity extends Entity {
 
     public ResourceLocation getTexture() {
         if (this.playerUUID == null) {
-            if (this.world.isRemote) {
+            if (this.level.isClientSide) {
                 //Client; needs to send one request message. PlayerUUID will be set by MessagePlayerID
                 if (!this.sentRequest) {
                     MessagePlayerIDRequest mpidr = new MessagePlayerIDRequest();
@@ -112,7 +119,7 @@ public class PeekerEntity extends Entity {
             }
             return null;
         }
-        if (this.texture == null && this.world.isRemote) {
+        if (this.texture == null && this.level.isClientSide) {
             AbstractClientPlayerEntity acpe = (AbstractClientPlayerEntity) this.world.getPlayerByUuid(this.playerUUID);
             // If we can't find the player with this UUID they probably don't exist now, so we shouldn't render their peeker
             this.texture = acpe == null ? null : acpe.getLocationSkin();
@@ -122,7 +129,7 @@ public class PeekerEntity extends Entity {
 
     @SubscribeEvent
     public void onHurt(LivingHurtEvent lhe) {
-        if (this.world != null && this.world.isRemote && this.playerUUID != null) {
+        if (this.level != null && this.level.isClientSide && this.playerUUID != null) {
             UUID hurtEntityUUID = lhe.getEntity().getUniqueID();
             if(hurtEntityUUID.equals(this.playerUUID)) {
                 MessageEndPeek mep = new MessageEndPeek();
@@ -134,7 +141,7 @@ public class PeekerEntity extends Entity {
 
     @SubscribeEvent
     public void onDeath(LivingDeathEvent lde) {
-        if (this.world != null && this.world.isRemote && this.playerUUID != null && lde.getEntity().getUniqueID().equals(this.playerUUID)) {
+        if (this.level != null && this.level.isClientSide && this.playerUUID != null && lde.getEntity().getUniqueID().equals(this.playerUUID)) {
             MessageEndPeek mep = new MessageEndPeek();
             mep.peekerUUID = this.getUniqueID();
             MessageHandler.INSTANCE.sendToServer(mep);
@@ -152,7 +159,7 @@ public class PeekerEntity extends Entity {
      * @param compound
      */
     @Override
-    protected void readAdditional(CompoundNBT compound) {
+    protected void readAdditional(CompoundTag compound) {
         this.playerUUID = new UUID(compound.getLong("msb"), compound.getLong("lsb"));
         this.setRotation(compound.getFloat("yaw"), 0.0F);
     }
@@ -164,7 +171,7 @@ public class PeekerEntity extends Entity {
      * @param compound the compound to be written into
      */
     @Override
-    protected void writeAdditional(CompoundNBT compound) {
+    protected void writeAdditional(CompoundTag compound) {
         compound.putLong("msb", this.playerUUID.getMostSignificantBits());
         compound.putLong("lsb", this.playerUUID.getLeastSignificantBits());
         compound.putFloat("yaw", this.rotationYaw);

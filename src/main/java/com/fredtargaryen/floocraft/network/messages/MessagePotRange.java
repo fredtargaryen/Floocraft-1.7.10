@@ -1,12 +1,12 @@
 package com.fredtargaryen.floocraft.network.messages;
 
 import com.fredtargaryen.floocraft.FloocraftBase;
-import com.fredtargaryen.floocraft.tileentity.FloowerPotTileEntity;
+import com.fredtargaryen.floocraft.blockentity.FloowerPotBlockEntity;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.server.ServerWorld;
-import net.minecraftforge.fml.network.NetworkEvent;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
@@ -15,12 +15,12 @@ public class MessagePotRange {
     public int amount;
     public BlockPos pos;
 
-    public void onMessage(Supplier<NetworkEvent.Context> ctx) {
+    public static void handle(MessagePotRange message, Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            ServerWorld sw = ctx.get().getSender().getServerWorld();
-            TileEntity te = sw.getTileEntity(MessagePotRange.this.pos);
+            ServerLevel sw = ctx.get().getSender().getLevel();
+            BlockEntity te = sw.getBlockEntity(message.pos);
             if(te.getType() == FloocraftBase.POT_TYPE.get())
-                ((FloowerPotTileEntity) te).adjustPotRange(this.range, this.amount);
+                ((FloowerPotBlockEntity) te).adjustPotRange(message.range, message.amount);
         });
         ctx.get().setPacketHandled(true);
     }

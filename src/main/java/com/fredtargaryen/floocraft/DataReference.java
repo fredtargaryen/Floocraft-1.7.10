@@ -1,6 +1,9 @@
 package com.fredtargaryen.floocraft;
 
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.block.Block;
 
 /**
  * ===DESCRIPTION OF MESSAGE CHANNELS===
@@ -30,11 +33,15 @@ public class DataReference {
     public static final int POT_MIN_V_RANGE = 2;
     public static final int POT_MAX_V_RANGE = 5;
 
+    // GUI textures
     public static final ResourceLocation SIGN_TEX_LOC = new ResourceLocation(MODID, "blocks/floosign");
     public static final ResourceLocation TP_BACKGROUND = new ResourceLocation(MODID, "textures/blocks/tp_background.png");
 
+    // Custom tags
     public static final ResourceLocation VALID_ARRIVAL_BLOCKS = new ResourceLocation(MODID, "valid_arrival_blocks");
     public static final ResourceLocation VALID_DEPARTURE_BLOCKS = new ResourceLocation(MODID, "valid_departure_blocks");
+    public static final TagKey<Block> VALID_ARRIVAL_BLOCKS_TAG = BlockTags.create(VALID_ARRIVAL_BLOCKS);
+    public static final TagKey<Block> VALID_DEPARTURE_BLOCKS_TAG = BlockTags.create(VALID_DEPARTURE_BLOCKS);
 
     public static final ResourceLocation GREENED_RL = new ResourceLocation(MODID, "greened");
     public static final ResourceLocation TP_RL = new ResourceLocation(MODID, "tp");

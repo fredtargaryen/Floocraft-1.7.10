@@ -1,29 +1,30 @@
 package com.fredtargaryen.floocraft.client.particle;
 
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.*;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particles.BasicParticleType;
-import net.minecraft.world.World;
+import net.minecraft.core.particles.SimpleParticleType;
+import org.jetbrains.annotations.NotNull;
 
-public class GreenFlameParticle extends SpriteTexturedParticle {
-    private GreenFlameParticle(ClientWorld world, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed, IAnimatedSprite spriteSet) {
-        super(world, x, y, z, xSpeed, ySpeed, zSpeed);
+public class GreenFlameParticle extends TextureSheetParticle {
+    private GreenFlameParticle(ClientLevel level, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed, SpriteSet spriteSet) {
+        super(level, x, y, z, xSpeed, ySpeed, zSpeed);
         this.setSprite(spriteSet.get(0, 50));
-        this.maxAge = (int)(8.0D / (Math.random() * 0.8D + 0.2D)) + 4;
-    }
-
-    public float getScale(float p_217561_1_) {
-        float f = ((float)this.age + p_217561_1_) / (float)this.maxAge;
-        return this.particleScale * (1.0F - f * f * 0.5F);
+        this.lifetime = (int)(8.0D / (Math.random() * 0.8D + 0.2D)) + 4;
     }
 
     @Override
-    public IParticleRenderType getRenderType() {
-        return IParticleRenderType.PARTICLE_SHEET_OPAQUE;
+    public float getQuadSize(float p_217561_1_) {
+        float f = ((float)this.age + p_217561_1_) / (float)this.lifetime;
+        return this.quadSize * (1.0F - f * f * 0.5F);
     }
 
     @Override
-    public int getBrightnessForRender(float partialTick) {
+    public @NotNull ParticleRenderType getRenderType() {
+        return ParticleRenderType.PARTICLE_SHEET_OPAQUE;
+    }
+
+    @Override
+    public int getLightColor(float partialTick) {
         //Full brightness
         return 0xf000f0;
     }
@@ -33,20 +34,20 @@ public class GreenFlameParticle extends SpriteTexturedParticle {
      */
     @Override
     public void tick() {
-        if (this.age++ >= this.maxAge) {
-            this.setExpired();
+        if (this.age++ >= this.lifetime) {
+            this.remove();
         }
     }
 
-    public static class Factory implements IParticleFactory<BasicParticleType> {
-        private IAnimatedSprite sprites;
+    public static class Provider implements ParticleProvider<SimpleParticleType> {
+        private final SpriteSet sprite;
 
-        public Factory(IAnimatedSprite sprites) {
-            this.sprites = sprites;
+        public Provider(SpriteSet sprite) {
+            this.sprite = sprite;
         }
 
-        public Particle makeParticle(BasicParticleType typeIn, ClientWorld worldIn, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed) {
-            return new GreenFlameParticle(worldIn, x, y, z, xSpeed, ySpeed, zSpeed, this.sprites);
+        public Particle createParticle(SimpleParticleType type, ClientLevel level, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed) {
+            return new GreenFlameParticle(level, x, y, z, xSpeed, ySpeed, zSpeed, this.sprite);
         }
     }
 }

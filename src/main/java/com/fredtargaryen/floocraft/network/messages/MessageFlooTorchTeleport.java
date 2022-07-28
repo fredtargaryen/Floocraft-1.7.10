@@ -2,12 +2,12 @@ package com.fredtargaryen.floocraft.network.messages;
 
 import com.fredtargaryen.floocraft.FloocraftBase;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.block.Block;
-import net.minecraft.entity.player.ServerPlayerEntity;
-import net.minecraft.util.SoundCategory;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.network.NetworkEvent;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,13 +28,13 @@ public class MessageFlooTorchTeleport {
         return xDiff + zDiff == 1;
     }
 
-    public void onMessage(Supplier<NetworkEvent.Context> ctx) {
+    public static void handle(MessageFlooTorchTeleport message, Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            int torchX1 = this.torchX;
-            int torchY1 = this.torchY;
-            int torchZ1 = this.torchZ;
-            ServerPlayerEntity player = ctx.get().getSender();
-            World world = player.getServerWorld();
+            int torchX1 = message.torchX;
+            int torchY1 = message.torchY;
+            int torchZ1 = message.torchZ;
+            ServerPlayer player = ctx.get().getSender();
+            Level level = player.getLevel();
             int minx = torchX1 - 3;
             int maxx = torchX1 + 3;
             int minz = torchZ1 - 3;
@@ -47,12 +47,12 @@ public class MessageFlooTorchTeleport {
                     //Prevent the player from teleporting onto the torch again
                     if(x != torchX1 && z != torchZ1) {
                         BlockPos nextPos = new BlockPos(x, torchY1, z);
-                        if(world.isAirBlock(nextPos.up())) {
+                        if(level.isEmptyBlock(nextPos.above())) {
                             //There is enough headroom for the player to teleport here
-                            if (world.isAirBlock(nextPos)) {
+                            if (level.isEmptyBlock(nextPos)) {
                                 //There is enough legroom
                                 coords.add(nextPos);
-                            } else if (world.getBlockState(nextPos).getBlock() == flooTorchBlock) {
+                            } else if (level.getBlockState(nextPos).getBlock() == flooTorchBlock) {
                                 //There is a Floo Torch nearby
                                 torchCoords.add(nextPos);
                             }
@@ -82,16 +82,16 @@ public class MessageFlooTorchTeleport {
             }
             if(finalCoords.size() > 0)
             {
-                BlockPos chosenCoord = finalCoords.get(world.rand.nextInt(finalCoords.size()));
+                BlockPos chosenCoord = finalCoords.get(level.random.nextInt(finalCoords.size()));
                 double x = chosenCoord.getX() + 0.5;
                 double y = chosenCoord.getY();
                 double z = chosenCoord.getZ() + 0.5;
-                if(player.getRidingEntity() != null) {
+                if(player.getVehicle() != null) {
                     player.stopRiding();
                 }
-                player.connection.setPlayerLocation(x, y, z, player.rotationYaw, player.rotationPitch);
+                player.connection.teleport(x, y, z, player.getYRot(), player.getXRot());
                 player.fallDistance = 0.0F;
-                world.playSound(null, new BlockPos(torchX1, torchY1, torchZ1), FloocraftBase.FLICK.get(), SoundCategory.BLOCKS, 1.0F, 1.0F);
+                level.playSound(null, new BlockPos(torchX1, torchY1, torchZ1), FloocraftBase.FLICK.get(), SoundSource.BLOCKS, 1.0F, 1.0F);
             }
         });
 

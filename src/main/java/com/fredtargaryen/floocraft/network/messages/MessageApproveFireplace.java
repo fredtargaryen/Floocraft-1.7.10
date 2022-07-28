@@ -1,14 +1,14 @@
 package com.fredtargaryen.floocraft.network.messages;
 
+import com.fredtargaryen.floocraft.blockentity.FlooSignBlockEntity;
 import com.fredtargaryen.floocraft.network.FloocraftWorldData;
 import com.fredtargaryen.floocraft.network.MessageHandler;
-import com.fredtargaryen.floocraft.tileentity.FireplaceTileEntity;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.entity.player.ServerPlayerEntity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.server.ServerWorld;
-import net.minecraftforge.fml.network.NetworkEvent;
-import net.minecraftforge.fml.network.PacketDistributor;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.network.NetworkEvent;
+import net.minecraftforge.network.PacketDistributor;
 
 import java.nio.charset.Charset;
 import java.util.function.Supplier;
@@ -19,21 +19,21 @@ public class MessageApproveFireplace {
     public String[] name;
     private static final Charset defaultCharset = Charset.defaultCharset();
 
-    public void onMessage(Supplier<NetworkEvent.Context> ctx) {
+    public static void handle(MessageApproveFireplace message, Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            ServerPlayerEntity spe = ctx.get().getSender();
-            ServerWorld w = spe.getServerWorld();
-            FireplaceTileEntity fte = (FireplaceTileEntity) (w.getTileEntity(new BlockPos(this.x, this.y, this.z)));
+            ServerPlayer spe = ctx.get().getSender();
+            ServerLevel w = spe.getLevel();
+            FlooSignBlockEntity fte = (FlooSignBlockEntity) (w.getBlockEntity(new BlockPos(message.x, message.y, message.z)));
             if(fte != null) {
-                if (this.attemptingToConnect) {
-                    boolean approved = !FloocraftWorldData.forWorld(w).placeList.containsKey(FireplaceTileEntity.getSignTextAsLine(this.name));
+                if (message.attemptingToConnect) {
+                    boolean approved = !FloocraftWorldData.forLevel(w).placeList.containsKey(FlooSignBlockEntity.getSignTextAsLine(message.name));
                     MessageApproval ma = new MessageApproval(approved);
                     MessageHandler.INSTANCE.send(PacketDistributor.PLAYER.with(() -> spe), ma);
                     if (approved) {
-                        fte.setString(0, this.name[0]);
-                        fte.setString(1, this.name[1]);
-                        fte.setString(2, this.name[2]);
-                        fte.setString(3, this.name[3]);
+                        fte.setString(0, message.name[0]);
+                        fte.setString(1, message.name[1]);
+                        fte.setString(2, message.name[2]);
+                        fte.setString(3, message.name[3]);
                         fte.addLocation();
                         fte.setConnected(true);
                     }
@@ -44,10 +44,10 @@ public class MessageApproveFireplace {
                 } else {
                     MessageApproval ma = new MessageApproval(true);
                     MessageHandler.INSTANCE.send(PacketDistributor.PLAYER.with(() -> spe), ma);
-                    fte.setString(0, this.name[0]);
-                    fte.setString(1, this.name[1]);
-                    fte.setString(2, this.name[2]);
-                    fte.setString(3, this.name[3]);
+                    fte.setString(0, message.name[0]);
+                    fte.setString(1, message.name[1]);
+                    fte.setString(2, message.name[2]);
+                    fte.setString(3, message.name[3]);
                     fte.setConnected(false);
                 }
             }

@@ -3,30 +3,30 @@ package com.fredtargaryen.floocraft.command;
 import com.fredtargaryen.floocraft.network.FloocraftWorldData;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import net.minecraft.command.CommandSource;
-import net.minecraft.command.Commands;
-import net.minecraft.command.arguments.DimensionArgument;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.world.server.ServerWorld;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.DimensionArgument;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ViewCommand {
-    public static void register(CommandDispatcher<CommandSource> dispatcher) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("viewfireplace")
-                .requires(e -> e.hasPermissionLevel(2))
-                .then(Commands.argument("Dimension", DimensionArgument.getDimension())
-                .then(Commands.argument("Fireplace search query (\"\" for all fireplaces)", StringArgumentType.string())
+                .requires(stack -> stack.hasPermission(2))
+                .then(Commands.argument("Dimension", DimensionArgument.dimension())
+                        .then(Commands.argument("Fireplace search query (\"\" for all fireplaces)", StringArgumentType.string())
                 .executes(e -> execute(
                         e.getSource(),
-                        DimensionArgument.getDimensionArgument(e, "Dimension"),
+                        DimensionArgument.getDimension(e, "Dimension"),
                         StringArgumentType.getString(e, "Fireplace search query (\"\" for all fireplaces)")
                 )))));
     }
 
-    private static int execute(CommandSource source, ServerWorld world, String query) {
-        ConcurrentHashMap<String, int[]> placeList = FloocraftWorldData.forWorld(world).placeList;
+    private static int execute(CommandSourceStack stack, ServerLevel level, String query) {
+        ConcurrentHashMap<String, int[]> placeList = FloocraftWorldData.forLevel(level).placeList;
         Iterator<String> keyIterator = placeList.keySet().iterator();
         boolean placesFound = false;
         while(keyIterator.hasNext())
@@ -35,12 +35,12 @@ public class ViewCommand {
             if(s.startsWith(query)) {
                 placesFound = true;
                 int[] coords = placeList.get(s);
-                source.sendFeedback(new StringTextComponent(String.format("\"%s\" exists at (%d, %d, %d)", s, coords[0], coords[1], coords[2])), false);
+                stack.sendSuccess(new TextComponent(String.format("\"%s\" exists at (%d, %d, %d)", s, coords[0], coords[1], coords[2])), false);
             }
         }
         if(!placesFound)
         {
-            source.sendFeedback(new StringTextComponent(String.format("No places were found with names beginning with \"%s\".", query)), false);
+            stack.sendFailure(new TextComponent(String.format("No places were found with names beginning with \"%s\".", query)));
         }
         return 0;
     }

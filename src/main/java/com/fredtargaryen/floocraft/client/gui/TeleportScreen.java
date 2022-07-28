@@ -5,19 +5,17 @@ import com.fredtargaryen.floocraft.FloocraftBase;
 import com.fredtargaryen.floocraft.network.MessageHandler;
 import com.fredtargaryen.floocraft.network.messages.*;
 import com.fredtargaryen.floocraft.proxy.ClientProxy;
-import com.mojang.blaze3d.matrix.MatrixStack;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.button.Button;
-import net.minecraft.client.gui.widget.list.ExtendedList;
-import net.minecraft.client.renderer.BufferBuilder;
-import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import com.mojang.blaze3d.vertex.*;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.ObjectSelectionList;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.lwjgl.opengl.GL11;
@@ -25,8 +23,8 @@ import org.lwjgl.opengl.GL11;
 @OnlyIn(Dist.CLIENT)
 public class TeleportScreen extends Screen {
     /** The title string that is displayed in the top-centre of the screen. */
-    private static final String screenTitle = I18n.format("gui.teleport.title");
-    private String status;
+    private static final Component screenTitle = new TranslatableComponent("gui.teleport.title");
+    private Component status;
 
     //"Peek..."
     private Button peekBtn;
@@ -50,13 +48,15 @@ public class TeleportScreen extends Screen {
 
     private int peekAttemptTimer;
 
-    private static final TranslationTextComponent REFRESH = new TranslationTextComponent("gui.teleport.refresh");
-    private static final TranslationTextComponent PEEK = new TranslationTextComponent("gui.teleport.peek");
-    private static final TranslationTextComponent TELEPORT = new TranslationTextComponent("gui.teleport.go");
-    private static final TranslationTextComponent CANCEL = new TranslationTextComponent("gui.teleport.cancel");
-	
+    private static final TranslatableComponent REFRESH = new TranslatableComponent("gui.teleport.refresh");
+    private static final TranslatableComponent PEEK = new TranslatableComponent("gui.teleport.peek");
+    private static final TranslatableComponent TELEPORT = new TranslatableComponent("gui.teleport.go");
+    private static final TranslatableComponent CANCEL = new TranslatableComponent("gui.teleport.cancel");
+    private static final TranslatableComponent LOADING = new TranslatableComponent("gui.teleport.loading");
+    private static final TranslatableComponent EMPTY = new TranslatableComponent("gui.teleport.empty");
+
     public TeleportScreen(int x, int y, int z) {
-        super(new StringTextComponent(screenTitle));
+        super(screenTitle);
     	this.initX = x;
     	this.initY = y;
     	this.initZ = z;
@@ -71,14 +71,13 @@ public class TeleportScreen extends Screen {
      */
     @Override
     public void init() {
-        this.buttons.clear();
-        this.minecraft.keyboardListener.enableRepeatEvents(true);
+        this.minecraft.keyboardHandler.setSendRepeatsToGui(true);
         Button refreshButton = new Button(this.width - 100, 0, 98, 20, REFRESH, button -> {
             TeleportScreen.this.refresh();
             TeleportScreen.this.init();
         });
         refreshButton.active = false;
-        this.addButton(this.peekBtn = new Button(this.width / 2 - 151, this.height - 40, 98, 20, PEEK, button -> {
+        this.peekBtn = new Button(this.width / 2 - 151, this.height - 40, 98, 20, PEEK, button -> {
             String dest = (String) TeleportScreen.this.placeList[TeleportScreen.this.scrollWindow.getSelected().id];
             try {
                 MessagePeekRequest m = new MessagePeekRequest();
@@ -90,9 +89,10 @@ public class TeleportScreen extends Screen {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }));
+        });
         this.peekBtn.active = false;
-        this.addButton(this.goBtn = new Button(this.width / 2 - 49, this.height - 40, 98, 20, TELEPORT, button -> {
+        this.addRenderableWidget(this.peekBtn);
+        this.goBtn = new Button(this.width / 2 - 49, this.height - 40, 98, 20, TELEPORT, button -> {
             int initX = TeleportScreen.this.initX;
             int initY = TeleportScreen.this.initY;
             int initZ = TeleportScreen.this.initZ;
@@ -109,18 +109,20 @@ public class TeleportScreen extends Screen {
                 e.printStackTrace();
             }
             TeleportScreen.this.cancelBtn.onClick(0.0, 0.0);
-        }));
+        });
         this.goBtn.active = false;
-        this.addButton(this.cancelBtn = new Button(this.width / 2 + 53, this.height - 40, 98, 20, CANCEL, button -> {
+        this.addRenderableWidget(this.goBtn);
+        this.cancelBtn = new Button(this.width / 2 + 53, this.height - 40, 98, 20, CANCEL, button -> {
             ((ClientProxy) FloocraftBase.proxy).overrideTicker.start();
-            TeleportScreen.this.minecraft.displayGuiScreen(null);
-        }));
+            TeleportScreen.this.minecraft.setScreen(null);
+        });
+        this.addRenderableWidget(this.cancelBtn);
         if (receivedLists) {
             refreshButton.active = true;
             this.scrollWindow = new PlaceScrollWindow();
-            this.children.add(this.scrollWindow);
+            this.addRenderableWidget(this.scrollWindow);
         }
-        this.addButton(refreshButton);
+        this.addRenderableWidget(refreshButton);
     }
 
     /**
@@ -129,7 +131,7 @@ public class TeleportScreen extends Screen {
     @Override
     public void onClose() {
         ClientProxy proxy = (ClientProxy) FloocraftBase.proxy;
-        this.minecraft.keyboardListener.enableRepeatEvents(false);
+        this.minecraft.keyboardHandler.setSendRepeatsToGui(false);
         proxy.overrideTicker.start();
         super.onClose();
     }
@@ -141,15 +143,15 @@ public class TeleportScreen extends Screen {
     public void tick() {
         super.tick();
         if (!this.receivedLists) {
-            this.status = I18n.format("gui.teleport.loading");
+            this.status = LOADING;
         }
         else {//if the lists were received...
             //if they are empty...
             if (this.placeList.length == 0) {
-                this.status = I18n.format("gui.teleport.empty");
+                this.status = EMPTY;
             } else {
                 if(this.peekAttemptTimer == 0) {
-                    this.status = "";
+                    this.status = TextComponent.EMPTY;
                 }
             }
         }
@@ -173,7 +175,7 @@ public class TeleportScreen extends Screen {
      */
     @Override
     @OnlyIn(Dist.CLIENT)
-    public void render(MatrixStack stack, int mousex, int mousey, float partialticks) {
+    public void render(PoseStack stack, int mousex, int mousey, float partialticks) {
         this.renderBackground(stack);
         this.drawCenteredString(stack, this.font,
                 this.status,
@@ -198,7 +200,7 @@ public class TeleportScreen extends Screen {
     }
     
     private void refresh() {
-        this.children.remove(this.scrollWindow);
+        this.children().remove(this.scrollWindow);
         this.scrollWindow = null;
     	this.placeList = new Object[]{};
     	this.enabledList = new boolean[]{};
@@ -219,7 +221,7 @@ public class TeleportScreen extends Screen {
     }
 
     public void onStartPeek(MessageStartPeek msp) {
-        this.minecraft.displayGuiScreen(
+        this.minecraft.setScreen(
                 new PeekScreen(
                         (String)this.placeList[this.scrollWindow.getSelected().id], msp.peekerUUID));
     }
@@ -242,7 +244,7 @@ public class TeleportScreen extends Screen {
     }
 
     @OnlyIn(Dist.CLIENT)
-    class GuiPlaceEntry extends ExtendedList.AbstractListEntry<GuiPlaceEntry> {
+    class GuiPlaceEntry extends ObjectSelectionList.Entry<GuiPlaceEntry> {
         private int id;
 
         GuiPlaceEntry(int id) {
@@ -250,7 +252,7 @@ public class TeleportScreen extends Screen {
         }
 
         @Override
-        public void render(MatrixStack stack, int entryId, int top, int left, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean b, float partialTicks) {
+        public void render(PoseStack stack, int entryId, int top, int left, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean b, float partialTicks) {
             TeleportScreen.this.drawCenteredString(stack, TeleportScreen.this.font, (String) TeleportScreen.this.placeList[this.id], TeleportScreen.this.width / 2, top + 3, TeleportScreen.this.enabledList[this.id] ? 65280 : 16711680);
         }
 
@@ -259,10 +261,14 @@ public class TeleportScreen extends Screen {
             TeleportScreen.this.scrollWindow.setSelected(this);
             return true;
         }
+
+        public Component getNarration() {
+            return new TextComponent((String) TeleportScreen.this.placeList[this.id]);
+        }
     }
 
     @OnlyIn(Dist.CLIENT)
-    class PlaceScrollWindow extends ExtendedList<GuiPlaceEntry> {
+    class PlaceScrollWindow extends ObjectSelectionList<GuiPlaceEntry> implements GuiEventListener {
         PlaceScrollWindow() {
             super(TeleportScreen.this.minecraft, TeleportScreen.this.width, TeleportScreen.this.height, 32, TeleportScreen.this.height - 64, 18);
             this.setRenderSelection(true);
@@ -307,73 +313,67 @@ public class TeleportScreen extends Screen {
         }
 
         @Override
-        protected void renderBackground(MatrixStack stack){}
-
-        @Override
-        public void render(MatrixStack stack, int mouseX, int mouseY, float partialTicks) {
+        public void render(PoseStack stack, int mouseX, int mouseY, float partialTicks) {
             int i = this.getScrollbarPosition();
             int j = i + 6;
-            RenderSystem.disableLighting();
-            RenderSystem.disableFog();
-            Tessellator tessellator = Tessellator.getInstance();
-            BufferBuilder bufferbuilder = tessellator.getBuffer();
-            RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
+            Tesselator tesselator = Tesselator.getInstance();
+            BufferBuilder builder = tesselator.getBuilder();
+            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
             int k = this.getRowLeft();
             int l = this.y0 + 4 - (int)this.getScrollAmount();
 
             this.renderList(stack, k, l, mouseX, mouseY, partialTicks);
-            RenderSystem.disableDepthTest();
+            RenderSystem.depthMask(false);
             RenderSystem.enableBlend();
-            RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA.param, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA.param, GlStateManager.SourceFactor.ZERO.param, GlStateManager.DestFactor.ONE.param);
-            RenderSystem.disableAlphaTest();
-            RenderSystem.shadeModel(7425);
+            RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA.value, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA.value, GlStateManager.SourceFactor.ZERO.value, GlStateManager.DestFactor.ONE.value);
+            RenderSystem.disableBlend();
+            //RenderSystem.shadeModel(7425); TODO Needed?
             RenderSystem.disableTexture();
             int i1 = 4;
-            bufferbuilder.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-            bufferbuilder.pos((double)this.x0, (double)(this.y0 + 4), 0.0D).tex(0f, 1f).color(0, 0, 0, 0).endVertex();
-            bufferbuilder.pos((double)this.x1, (double)(this.y0 + 4), 0.0D).tex(1f, 1f).color(0, 0, 0, 0).endVertex();
-            bufferbuilder.pos((double)this.x1, (double)this.y0, 0.0D).tex(1f, 0f).color(0, 0, 0, 255).endVertex();
-            bufferbuilder.pos((double)this.x0, (double)this.y0, 0.0D).tex(0f, 0f).color(0, 0, 0, 255).endVertex();
-            tessellator.draw();
-            bufferbuilder.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-            bufferbuilder.pos((double)this.x0, (double)this.y1, 0.0D).tex(0f, 1f).color(0, 0, 0, 255).endVertex();
-            bufferbuilder.pos((double)this.x1, (double)this.y1, 0.0D).tex(1f, 1f).color(0, 0, 0, 255).endVertex();
-            bufferbuilder.pos((double)this.x1, (double)(this.y1 - 4), 0.0D).tex(1f, 0f).color(0, 0, 0, 0).endVertex();
-            bufferbuilder.pos((double)this.x0, (double)(this.y1 - 4), 0.0D).tex(0f, 0f).color(0, 0, 0, 0).endVertex();
-            tessellator.draw();
+            builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            builder.vertex((double)this.x0, (double)(this.y0 + 4), 0.0D).uv(0f, 1f).color(0, 0, 0, 0).endVertex();
+            builder.vertex((double)this.x1, (double)(this.y0 + 4), 0.0D).uv(1f, 1f).color(0, 0, 0, 0).endVertex();
+            builder.vertex((double)this.x1, (double)this.y0, 0.0D).uv(1f, 0f).color(0, 0, 0, 255).endVertex();
+            builder.vertex((double)this.x0, (double)this.y0, 0.0D).uv(0f, 0f).color(0, 0, 0, 255).endVertex();
+            tesselator.end();
+            builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            builder.vertex((double)this.x0, (double)this.y1, 0.0D).uv(0f, 1f).color(0, 0, 0, 255).endVertex();
+            builder.vertex((double)this.x1, (double)this.y1, 0.0D).uv(1f, 1f).color(0, 0, 0, 255).endVertex();
+            builder.vertex((double)this.x1, (double)(this.y1 - 4), 0.0D).uv(1f, 0f).color(0, 0, 0, 0).endVertex();
+            builder.vertex((double)this.x0, (double)(this.y1 - 4), 0.0D).uv(0f, 0f).color(0, 0, 0, 0).endVertex();
+            tesselator.end();
             int j1 = Math.max(0, this.getMaxPosition() - (this.y1 - this.y0 - 4));
             if (j1 > 0) {
                 int k1 = (int)((float)((this.y1 - this.y0) * (this.y1 - this.y0)) / (float)this.getMaxPosition());
-                k1 = MathHelper.clamp(k1, 32, this.y1 - this.y0 - 8);
+                k1 = Mth.clamp(k1, 32, this.y1 - this.y0 - 8);
                 int l1 = (int)this.getScrollAmount() * (this.y1 - this.y0 - k1) / j1 + this.y0;
                 if (l1 < this.y0) {
                     l1 = this.y0;
                 }
 
-                bufferbuilder.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-                bufferbuilder.pos((double)i, (double)this.y1, 0.0D).tex(0f, 1f).color(0, 0, 0, 255).endVertex();
-                bufferbuilder.pos((double)j, (double)this.y1, 0.0D).tex(1f, 1f).color(0, 0, 0, 255).endVertex();
-                bufferbuilder.pos((double)j, (double)this.y0, 0.0D).tex(1f, 0f).color(0, 0, 0, 255).endVertex();
-                bufferbuilder.pos((double)i, (double)this.y0, 0.0D).tex(0f, 0f).color(0, 0, 0, 255).endVertex();
-                tessellator.draw();
-                bufferbuilder.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-                bufferbuilder.pos((double)i, (double)(l1 + k1), 0.0D).tex(0f, 1f).color(128, 128, 128, 255).endVertex();
-                bufferbuilder.pos((double)j, (double)(l1 + k1), 0.0D).tex(1f, 1f).color(128, 128, 128, 255).endVertex();
-                bufferbuilder.pos((double)j, (double)l1, 0.0D).tex(1f, 0f).color(128, 128, 128, 255).endVertex();
-                bufferbuilder.pos((double)i, (double)l1, 0.0D).tex(0f, 0f).color(128, 128, 128, 255).endVertex();
-                tessellator.draw();
-                bufferbuilder.begin(7, DefaultVertexFormats.POSITION_TEX_COLOR);
-                bufferbuilder.pos((double)i, (double)(l1 + k1 - 1), 0.0D).tex(0f, 1f).color(192, 192, 192, 255).endVertex();
-                bufferbuilder.pos((double)(j - 1), (double)(l1 + k1 - 1), 0.0D).tex(1f, 1f).color(192, 192, 192, 255).endVertex();
-                bufferbuilder.pos((double)(j - 1), (double)l1, 0.0D).tex(1f, 0f).color(192, 192, 192, 255).endVertex();
-                bufferbuilder.pos((double)i, (double)l1, 0.0D).tex(0f, 0f).color(192, 192, 192, 255).endVertex();
-                tessellator.draw();
+                builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+                builder.vertex(i, this.y1, 0.0D).uv(0f, 1f).color(0, 0, 0, 255).endVertex();
+                builder.vertex(j, this.y1, 0.0D).uv(1f, 1f).color(0, 0, 0, 255).endVertex();
+                builder.vertex(j, this.y0, 0.0D).uv(1f, 0f).color(0, 0, 0, 255).endVertex();
+                builder.vertex(i, this.y0, 0.0D).uv(0f, 0f).color(0, 0, 0, 255).endVertex();
+                tesselator.end();
+                builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+                builder.vertex((double)i, (double)(l1 + k1), 0.0D).uv(0f, 1f).color(128, 128, 128, 255).endVertex();
+                builder.vertex((double)j, (double)(l1 + k1), 0.0D).uv(1f, 1f).color(128, 128, 128, 255).endVertex();
+                builder.vertex((double)j, (double)l1, 0.0D).uv(1f, 0f).color(128, 128, 128, 255).endVertex();
+                builder.vertex((double)i, (double)l1, 0.0D).uv(0f, 0f).color(128, 128, 128, 255).endVertex();
+                tesselator.end();
+                builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+                builder.vertex((double)i, (double)(l1 + k1 - 1), 0.0D).uv(0f, 1f).color(192, 192, 192, 255).endVertex();
+                builder.vertex((double)(j - 1), (double)(l1 + k1 - 1), 0.0D).uv(1f, 1f).color(192, 192, 192, 255).endVertex();
+                builder.vertex((double)(j - 1), (double)l1, 0.0D).uv(1f, 0f).color(192, 192, 192, 255).endVertex();
+                builder.vertex((double)i, (double)l1, 0.0D).uv(0f, 0f).color(192, 192, 192, 255).endVertex();
+                tesselator.end();
             }
 
             this.renderDecorations(stack, mouseX, mouseY);
             RenderSystem.enableTexture();
-            RenderSystem.shadeModel(7424);
-            RenderSystem.enableAlphaTest();
+            //RenderSystem.shadeModel(7424); TODO needed?
             RenderSystem.disableBlend();
             this.flooverlayBackground(0, this.getTop());
             this.flooverlayBackground(this.getBottom(), this.height);
@@ -383,16 +383,15 @@ public class TeleportScreen extends Screen {
          * Overlays the background to hide scrolled items
          */
         private void flooverlayBackground(int p_148136_1_, int p_148136_2_) {
-            BufferBuilder wr = Tessellator.getInstance().getBuffer();
-            TeleportScreen.this.minecraft.getTextureManager().bindTexture(DataReference.TP_BACKGROUND);
-            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            BufferBuilder consumer = Tesselator.getInstance().getBuilder();
+            RenderSystem.setShaderTexture(0, DataReference.TP_BACKGROUND);
+            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
             float f = 32.0F;
-            wr.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_TEX);
-            wr.pos(0.0, (double)p_148136_2_, 0.0D).tex(0f, (float)p_148136_2_ / f).endVertex();
-            wr.pos(this.width, (double)p_148136_2_, 0.0D).tex((float)this.width / f, (float)p_148136_2_ / f).endVertex();
-            wr.pos(this.width, (double) p_148136_1_, 0.0D).tex((float) this.width / f, (float)p_148136_1_ / f).endVertex();
-            wr.pos(0.0, (double) p_148136_1_, 0.0D).tex(0f, (float)p_148136_1_ / f).endVertex();
-            Tessellator.getInstance().draw();
+            consumer.vertex(0.0, p_148136_2_, 0.0D).uv(0f, (float)p_148136_2_ / f).endVertex();
+            consumer.vertex(this.width, p_148136_2_, 0.0D).uv((float)this.width / f, (float)p_148136_2_ / f).endVertex();
+            consumer.vertex(this.width, p_148136_1_, 0.0D).uv((float) this.width / f, (float)p_148136_1_ / f).endVertex();
+            consumer.vertex(0.0, p_148136_1_, 0.0D).uv(0f, (float)p_148136_1_ / f).endVertex();
+            Tesselator.getInstance().end();
         }
     }
 }

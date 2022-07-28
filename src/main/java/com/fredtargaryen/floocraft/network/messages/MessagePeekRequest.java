@@ -7,15 +7,14 @@ import com.fredtargaryen.floocraft.entity.PeekerEntity;
 import com.fredtargaryen.floocraft.network.FloocraftWorldData;
 import com.fredtargaryen.floocraft.network.MessageHandler;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.block.Block;
-import net.minecraft.entity.player.ServerPlayerEntity;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.ITagCollection;
-import net.minecraft.util.Direction;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.network.NetworkEvent;
-import net.minecraftforge.fml.network.PacketDistributor;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.network.NetworkEvent;
+import net.minecraftforge.network.PacketDistributor;
 
 import java.nio.charset.Charset;
 import java.util.function.Supplier;
@@ -25,38 +24,39 @@ public class MessagePeekRequest {
     public String dest;
     private static final Charset defaultCharset = Charset.defaultCharset();
 
-	public void onMessage(Supplier<NetworkEvent.Context> ctx) {
+	public static void handle(MessagePeekRequest message, Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            int initX = this.initX;
-            int initY = this.initY;
-            int initZ = this.initZ;
-            ServerPlayerEntity player = ctx.get().getSender();
-            World world = player.world;
-            Block initBlock = world.getBlockState(new BlockPos(initX, initY, initZ)).getBlock();
-            int[] destCoords = FloocraftWorldData.forWorld(world).placeList.get(this.dest);
+            int initX = message.initX;
+            int initY = message.initY;
+            int initZ = message.initZ;
+            ServerPlayer player = ctx.get().getSender();
+            Level level = player.getLevel();
+            BlockState initState = level.getBlockState(new BlockPos(initX, initY, initZ));
+            Block initBlock = level.getBlockState(new BlockPos(initX, initY, initZ)).getBlock();
+            int[] destCoords = FloocraftWorldData.forLevel(level).placeList.get(message.dest);
             //Stop everything if the destination has the same coordinates as where the player is
-            if(!(destCoords[0] == this.initX && destCoords[1] == this.initY && destCoords[2] == this.initZ)) {
+            if(!(destCoords[0] == message.initX && destCoords[1] == message.initY && destCoords[2] == message.initZ)) {
                 Block greenBusy = FloocraftBase.GREEN_FLAMES_BUSY.get();
                 int destX = destCoords[0];
                 int destY = destCoords[1];
                 int destZ = destCoords[2];
                 //Checks whether the player is currently in busy or idle green flames
-                ITagCollection<Block> blockTags = BlockTags.getCollection();
-                if (initBlock.isIn(blockTags.get(DataReference.VALID_DEPARTURE_BLOCKS))) {
+                if (initState.is(DataReference.VALID_DEPARTURE_BLOCKS_TAG)) {
                     BlockPos dest = new BlockPos(destX, destY, destZ);
-                    Block destBlock = world.getBlockState(dest).getBlock();
+                    BlockState destState = level.getBlockState(dest);
+                    Block destBlock = level.getBlockState(dest).getBlock();
                     //Checks whether the destination is fire
-                    if (destBlock.isIn(blockTags.get(DataReference.VALID_ARRIVAL_BLOCKS))) {
-                        Direction direction = ((FlooFlamesBase) FloocraftBase.GREEN_FLAMES_TEMP.get()).isInFireplace(world, dest);
+                    if (destState.is(DataReference.VALID_ARRIVAL_BLOCKS_TAG)) {
+                        Direction direction = ((FlooFlamesBase) FloocraftBase.GREEN_FLAMES_TEMP.get()).isInFireplace(level, dest);
                         if (direction != null) {
                             Direction.Axis axis = direction.getAxis();
                             if (axis == Direction.Axis.X || axis == Direction.Axis.Z) {
                                 //Create peeker
-                                PeekerEntity peeker = new PeekerEntity(world);
+                                PeekerEntity peeker = new PeekerEntity(level);
                                 peeker.setPeekerData(player, dest, direction);
-                                world.addEntity(peeker);
+                                level.addFreshEntity(peeker);
                                 //Create message
-                                MessageStartPeek msp = new MessageStartPeek(peeker.getUniqueID());
+                                MessageStartPeek msp = new MessageStartPeek(peeker.getUUID());
                                 MessageHandler.INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), msp);
                             }
                         }

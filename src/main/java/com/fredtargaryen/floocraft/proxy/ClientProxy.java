@@ -2,16 +2,16 @@ package com.fredtargaryen.floocraft.proxy;
 
 import com.fredtargaryen.floocraft.DataReference;
 import com.fredtargaryen.floocraft.FloocraftBase;
+import com.fredtargaryen.floocraft.blockentity.renderer.FlooSignRenderer;
+import com.fredtargaryen.floocraft.blockentity.renderer.FloowerPotRenderer;
 import com.fredtargaryen.floocraft.client.gui.Flash;
 import com.fredtargaryen.floocraft.client.gui.FlooSignScreen;
 import com.fredtargaryen.floocraft.client.gui.FloowerPotScreen;
 import com.fredtargaryen.floocraft.client.gui.TeleportScreen;
-import com.fredtargaryen.floocraft.client.renderer.RenderPeekerFactory;
+import com.fredtargaryen.floocraft.client.renderer.PeekerRenderer;
 import com.fredtargaryen.floocraft.client.ticker.OverrideTicker;
 import com.fredtargaryen.floocraft.entity.PeekerEntity;
 import com.fredtargaryen.floocraft.network.messages.*;
-import com.fredtargaryen.floocraft.tileentity.renderer.TileEntityFlooSignRenderer;
-import com.fredtargaryen.floocraft.tileentity.renderer.TileEntityPotRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScreenManager;
 import net.minecraft.client.gui.screen.Screen;
@@ -66,14 +66,14 @@ public class ClientProxy implements IProxy {
 
     @Override
     public void registerGUIs() {
-        ScreenManager.registerFactory(FloocraftBase.POT_CONTAINER_TYPE.get(), FloowerPotScreen::new);
+        ScreenManager.registerFactory(FloocraftBase.POT_MENU_TYPE.get(), FloowerPotScreen::new);
     }
 
     @Override
     public void registerRenderers() {
-        ClientRegistry.bindTileEntityRenderer(FloocraftBase.FIREPLACE_TYPE.get(), TileEntityFlooSignRenderer::new);
-        ClientRegistry.bindTileEntityRenderer(FloocraftBase.POT_TYPE.get(), TileEntityPotRenderer::new);
-        RenderingRegistry.registerEntityRenderingHandler(FloocraftBase.PEEKER_TYPE.get(), new RenderPeekerFactory());
+        ClientRegistry.bindBlockEntityRenderer(FloocraftBase.FIREPLACE_TYPE.get(), FlooSignRenderer::new);
+        ClientRegistry.bindBlockEntityRenderer(FloocraftBase.POT_TYPE.get(), FloowerPotRenderer::new);
+        RenderingRegistry.registerEntityRenderingHandler(FloocraftBase.PEEKER_TYPE.get(), PeekerRenderer::new);
     }
 
     @Override

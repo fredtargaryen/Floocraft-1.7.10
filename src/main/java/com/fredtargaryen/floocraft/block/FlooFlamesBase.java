@@ -1,89 +1,86 @@
 package com.fredtargaryen.floocraft.block;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.SoulFireBlock;
-import net.minecraft.block.material.Material;
-import net.minecraft.particles.ParticleTypes;
-import net.minecraft.state.StateContainer;
-import net.minecraft.util.Direction;
-import net.minecraft.util.SoundCategory;
-import net.minecraft.util.SoundEvents;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.shapes.ISelectionContext;
-import net.minecraft.util.math.shapes.VoxelShape;
-import net.minecraft.util.math.shapes.VoxelShapes;
-import net.minecraft.world.IBlockReader;
-import net.minecraft.world.World;
-import net.minecraft.world.server.ServerWorld;
+import com.fredtargaryen.floocraft.FloocraftBase;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Material;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
-import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import static net.minecraft.state.properties.BlockStateProperties.AGE_0_15;
+import static net.minecraft.world.level.block.state.properties.BlockStateProperties.AGE_15;
 
-public abstract class FlooFlamesBase extends FlooMainTeleporterBase {
+public abstract class FlooFlamesBase extends FlooTeleporterBase {
     private static final Direction[] HORIZONTALS = new Direction[] { Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
-    private static final VoxelShape TALLBOX = Block.makeCuboidShape(0.0D, 0.0D, 0.0D, 16.0D, 32.0D, 16.0D);
+    private static final VoxelShape TALLBOX = Shapes.box(0.0D, 0.0D, 0.0D, 16.0D, 32.0D, 16.0D);
 
-    FlooFlamesBase(int lightLevel) { super(Properties.create(Material.FIRE).setLightLevel(state -> lightLevel)); }
+    FlooFlamesBase(int lightLevel) { super(Properties.of(Material.FIRE)
+            .lightLevel(state -> lightLevel)
+            .isViewBlocking((state, getter, pos) -> false)); }
 
-    @Override
-    protected void fillStateContainer(StateContainer.Builder<Block, BlockState> builder)
+    public static Block getFireBlockToPlace(Level l, BlockPos placeHere)
     {
-        builder.add(AGE_0_15);
+        return FlooTeleporterBase.shouldPlaceSoulBlockHere(l, placeHere) ? Blocks.SOUL_FIRE : Blocks.FIRE;
+    }
+
+    public static Block getFlooFireBlockToPlace(Level l, BlockPos placeHere)
+    {
+        return FlooTeleporterBase.shouldPlaceSoulBlockHere(l, placeHere) ? FloocraftBase.MAGENTA_FLAMES_BUSY.get() : FloocraftBase.GREEN_FLAMES_BUSY.get();
     }
 
     @Override
-    public VoxelShape getShape(BlockState state, IBlockReader worldIn, BlockPos pos, ISelectionContext context) { return TALLBOX; }
+    public VoxelShape getShape(BlockState state, BlockGetter getter, BlockPos pos, CollisionContext context) { return TALLBOX; }
 
     @Override
-    public void onBlockAdded(BlockState state, World worldIn, BlockPos pos, BlockState oldState, boolean b) {
-        if (isInFireplace(worldIn, pos) != null) {
-            worldIn.getPendingBlockTicks().scheduleTick(pos, this, this.getTimeToFirstTick());
+    public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean b) {
+        if (isInFireplace(level, pos) != null) {
+            level.scheduleTick(pos, this, this.getTimeToFirstTick());
         } else {
-            boolean soul = SoulFireBlock.shouldLightSoulFire(worldIn.getBlockState(pos.down()).getBlock());
-            worldIn.setBlockState(pos, (soul ? Blocks.SOUL_FIRE : Blocks.FIRE).getDefaultState());
+            level.setBlock(pos, getFireBlockToPlace(level, pos).defaultBlockState(), 3);
         }
     }
 
     @Override
-    public void tick(BlockState state, ServerWorld world, BlockPos pos, Random rand) {
-        if (isInFireplace(world, pos) == null || world.getBlockState(pos).get(AGE_0_15).equals(0)) {
-            boolean soul = SoulFireBlock.shouldLightSoulFire(world.getBlockState(pos.down()).getBlock());
-            world.setBlockState(pos, (soul ? Blocks.SOUL_FIRE : Blocks.FIRE).getDefaultState());
+    public void tick(BlockState state, ServerLevel level, BlockPos pos, Random rand) {
+        if (isInFireplace(level, pos) == null || level.getBlockState(pos).getValue(AGE_15).equals(0)) {
+            level.setBlock(pos, getFireBlockToPlace(level, pos).defaultBlockState(), 3);
         } else {
-            world.getPendingBlockTicks().scheduleTick(pos, this, 30 + rand.nextInt(10));
+            level.scheduleTick(pos, this, 30 + rand.nextInt(10));
         }
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void animateTick(BlockState stateIn, World worldIn, BlockPos pos, Random rand) {
+    public void animateTick(BlockState stateIn, Level level, BlockPos pos, Random rand) {
         if (rand.nextInt(24) == 0) {
-            worldIn.playSound((double)((float)pos.getX() + 0.5F), (double)((float)pos.getY() + 0.5F), (double)((float)pos.getZ() + 0.5F), SoundEvents.BLOCK_FIRE_AMBIENT, SoundCategory.BLOCKS, 1.0F + rand.nextFloat(), rand.nextFloat() * 0.7F + 0.3F, false);
+            level.playSound(null, pos, SoundEvents.FIRE_AMBIENT, SoundSource.BLOCKS, 1.0F + rand.nextFloat(), rand.nextFloat() * 0.7F + 0.3F);
         }
-        this.doSmokeParticles(stateIn, worldIn, pos, rand);
+        this.doSmokeParticles(stateIn, level, pos, rand);
     }
 
     @OnlyIn(Dist.CLIENT)
-    protected void doSmokeParticles(BlockState stateIn, World world, BlockPos pos, Random rand) {
+    protected void doSmokeParticles(BlockState stateIn, Level level, BlockPos pos, Random rand) {
         if(rand.nextInt(8) == 0) {
             double d0 = (double)pos.getX() + rand.nextDouble();
             double d1 = (double)pos.getY() + rand.nextDouble() * 0.5D + 0.5D;
             double d2 = (double)pos.getZ() + rand.nextDouble();
-            world.addParticle(ParticleTypes.LARGE_SMOKE, d0, d1, d2, 0.0D, 0.0D, 0.0D);
+            level.addParticle(ParticleTypes.LARGE_SMOKE, d0, d1, d2, 0.0D, 0.0D, 0.0D);
         }
-    }
-
-    @Override
-    public boolean isTransparent(BlockState state)
-    {
-        return true;
     }
 
     /**
@@ -95,27 +92,27 @@ public abstract class FlooFlamesBase extends FlooMainTeleporterBase {
     }
 
     //FIREPLACE VALIDATION CODE STARTS HERE
-    private int getTopBlockY(World w, BlockPos pos) {
-        BlockPos newPos = pos.offset(Direction.UP, 1);
+    private int getTopBlockY(Level l, BlockPos pos) {
+        BlockPos newPos = pos.relative(Direction.UP, 1);
         int y = newPos.getY();
-        BlockState bs = w.getBlockState(newPos);
-        while (bs.getBlock().isAir(bs, w, newPos) && y < 256) {
-            newPos = newPos.offset(Direction.UP, 1);
+        BlockState bs = l.getBlockState(newPos);
+        while (bs.isAir() && y < 256) {
+            newPos = newPos.relative(Direction.UP, 1);
             y = newPos.getY();
-            bs = w.getBlockState(newPos);
+            bs = l.getBlockState(newPos);
         }
         //When y >= 256 you get an air block, so if b is a solid cube y is implicitly < 256
         if (bs.getMaterial().isSolid()) return y;
         return 0;
     }
 
-    private boolean isWallColumn(World w, BlockPos bottomPos, int topY) {
+    private boolean isWallColumn(Level l, BlockPos bottomPos, int topY) {
         boolean valid = true;
         BlockPos newBottomPos = bottomPos;
         while (valid && newBottomPos.getY() < topY) {
-            BlockState bs = w.getBlockState(newBottomPos);
+            BlockState bs = l.getBlockState(newBottomPos);
             if (bs.getMaterial().isSolid()) {
-                newBottomPos = newBottomPos.offset(Direction.UP, 1);
+                newBottomPos = newBottomPos.relative(Direction.UP, 1);
             } else {
                 valid = false;
             }
@@ -123,24 +120,24 @@ public abstract class FlooFlamesBase extends FlooMainTeleporterBase {
         return valid;
     }
 
-    private List<Direction> getWalls(World w, BlockPos bottomPos, int topY) {
+    private List<Direction> getWalls(Level l, BlockPos bottomPos, int topY) {
         List<Direction> walls = new ArrayList<>();
-        if (this.isWallColumn(w, bottomPos.offset(Direction.NORTH), topY)) {
+        if (this.isWallColumn(l, bottomPos.relative(Direction.NORTH), topY)) {
             walls.add(Direction.NORTH);
         }
-        if (this.isWallColumn(w, bottomPos.offset(Direction.WEST), topY)) {
+        if (this.isWallColumn(l, bottomPos.relative(Direction.WEST), topY)) {
             walls.add(Direction.WEST);
         }
-        if (this.isWallColumn(w, bottomPos.offset(Direction.EAST), topY)) {
+        if (this.isWallColumn(l, bottomPos.relative(Direction.EAST), topY)) {
             walls.add(Direction.EAST);
         }
-        if (this.isWallColumn(w, bottomPos.offset(Direction.SOUTH), topY)) {
+        if (this.isWallColumn(l, bottomPos.relative(Direction.SOUTH), topY)) {
             walls.add(Direction.SOUTH);
         }
         return walls;
     }
 
-    private boolean canLoopToCorner(World w, int x, int y, int z, Direction backWall, Direction oldSideWall, int top) {
+    private boolean canLoopToCorner(Level l, int x, int y, int z, Direction backWall, Direction oldSideWall, int top) {
         int oldX = x;
         int oldZ = z;
         Direction sideWall = oldSideWall.getOpposite();
@@ -160,19 +157,19 @@ public abstract class FlooFlamesBase extends FlooMainTeleporterBase {
                 }
             }
             BlockPos newBottomPos = new BlockPos(x, y, z);
-            int newTop = this.getTopBlockY(w, newBottomPos);
-            List<Direction> walls = this.getWalls(w, newBottomPos, newTop);
+            int newTop = this.getTopBlockY(l, newBottomPos);
+            List<Direction> walls = this.getWalls(l, newBottomPos, newTop);
             switch (walls.size()) {
                 case 1:
                     if (!walls.contains(backWall)) {
                         return false;
                     } else {
                         if (newTop > top++) {
-                            if (!this.isWallColumn(w, new BlockPos(oldX, top, oldZ), newTop)) {
+                            if (!this.isWallColumn(l, new BlockPos(oldX, top, oldZ), newTop)) {
                                 return false;
                             }
                         } else if (newTop < top--) {
-                            if (!this.isWallColumn(w, new BlockPos(x, newTop, z), top)) {
+                            if (!this.isWallColumn(l, new BlockPos(x, newTop, z), top)) {
                                 return false;
                             }
                         }
@@ -202,11 +199,11 @@ public abstract class FlooFlamesBase extends FlooMainTeleporterBase {
      * @return Direction.UP if the fire block is in a corner of a valid fireplace; NORTH, SOUTH, EAST, WEST if the fire
      * is in a valid fireplace but not a corner; null if the fireplace is invalid
      */
-    public Direction isInFireplace(World w, BlockPos pos) {
+    public Direction isInFireplace(Level l, BlockPos pos) {
         if (pos.getY() < 254) {
-            int t = this.getTopBlockY(w, pos);
+            int t = this.getTopBlockY(l, pos);
             if (t > 0) {
-                List<Direction> walls = this.getWalls(w, pos, t);
+                List<Direction> walls = this.getWalls(l, pos, t);
                 int x = pos.getX();
                 int y = pos.getY();
                 int z = pos.getZ();
@@ -220,8 +217,8 @@ public abstract class FlooFlamesBase extends FlooMainTeleporterBase {
                     case 2:
                         if ((walls.contains(Direction.NORTH) && (walls.contains(Direction.WEST) || walls.contains(Direction.EAST))
                                 || (walls.contains(Direction.SOUTH) && (walls.contains(Direction.WEST) || walls.contains(Direction.EAST))))) {
-                            boolean zeroToOne = this.canLoopToCorner(w, x, y, z, walls.get(0), walls.get(1), t);
-                            boolean oneToZero = this.canLoopToCorner(w, x, y, z, walls.get(1), walls.get(0), t);
+                            boolean zeroToOne = this.canLoopToCorner(l, x, y, z, walls.get(0), walls.get(1), t);
+                            boolean oneToZero = this.canLoopToCorner(l, x, y, z, walls.get(1), walls.get(0), t);
                             if(zeroToOne && oneToZero) {
                                 //Fire is in corner of fireplace. Valid fireplace, but can't put a sign on a corner, so
                                 //return UP
@@ -243,20 +240,20 @@ public abstract class FlooFlamesBase extends FlooMainTeleporterBase {
                         switch (walls.get(0)) {
                             //This will be the back wall. If valid, this is the middle of a long fireplace
                             case NORTH:
-                                if      (this.canLoopToCorner(w, x, y, z, Direction.NORTH, Direction.WEST, t)
-                                        &&  this.canLoopToCorner(w, x, y, z, Direction.NORTH, Direction.EAST, t))
+                                if      (this.canLoopToCorner(l, x, y, z, Direction.NORTH, Direction.WEST, t)
+                                        &&  this.canLoopToCorner(l, x, y, z, Direction.NORTH, Direction.EAST, t))
                                     return Direction.SOUTH;
                             case WEST:
-                                if      (this.canLoopToCorner(w, x, y, z, Direction.WEST, Direction.SOUTH, t)
-                                        &&  this.canLoopToCorner(w, x, y, z, Direction.WEST, Direction.NORTH, t))
+                                if      (this.canLoopToCorner(l, x, y, z, Direction.WEST, Direction.SOUTH, t)
+                                        &&  this.canLoopToCorner(l, x, y, z, Direction.WEST, Direction.NORTH, t))
                                     return Direction.EAST;
                             case EAST:
-                                if      (this.canLoopToCorner(w, x, y, z, Direction.EAST, Direction.SOUTH, t)
-                                        &&  this.canLoopToCorner(w, x, y, z, Direction.EAST, Direction.NORTH, t))
+                                if      (this.canLoopToCorner(l, x, y, z, Direction.EAST, Direction.SOUTH, t)
+                                        &&  this.canLoopToCorner(l, x, y, z, Direction.EAST, Direction.NORTH, t))
                                     return Direction.WEST;
                             case SOUTH:
-                                if      (this.canLoopToCorner(w, x, y, z, Direction.SOUTH, Direction.WEST, t)
-                                        &&  this.canLoopToCorner(w, x, y, z, Direction.SOUTH, Direction.EAST, t))
+                                if      (this.canLoopToCorner(l, x, y, z, Direction.SOUTH, Direction.WEST, t)
+                                        &&  this.canLoopToCorner(l, x, y, z, Direction.SOUTH, Direction.EAST, t))
                                     return Direction.NORTH;
                                 break;
                         }
@@ -267,12 +264,5 @@ public abstract class FlooFlamesBase extends FlooMainTeleporterBase {
             }
         }
         return null;
-    }
-
-    //FOR ALLOWING COLLISIONS TO HAPPEN
-    @Override
-    @Nonnull
-    public VoxelShape getCollisionShape(@Nonnull BlockState state, @Nonnull IBlockReader worldIn, @Nonnull BlockPos pos, ISelectionContext context) {
-        return VoxelShapes.empty();
     }
 }

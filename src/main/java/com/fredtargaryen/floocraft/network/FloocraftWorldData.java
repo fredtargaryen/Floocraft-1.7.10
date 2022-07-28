@@ -3,13 +3,16 @@ package com.fredtargaryen.floocraft.network;
 import com.fredtargaryen.floocraft.DataReference;
 import com.fredtargaryen.floocraft.FloocraftBase;
 import com.fredtargaryen.floocraft.block.FlooFlamesBase;
-import com.fredtargaryen.floocraft.block.FlooFlamesTemp;
 import com.fredtargaryen.floocraft.network.messages.MessageFireplaceList;
 import net.minecraft.block.Block;
-import net.minecraft.nbt.CompoundNBT;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListNBT;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.server.ServerWorld;
 import net.minecraft.world.World;
 import net.minecraft.world.storage.DimensionSavedDataManager;
@@ -30,16 +33,16 @@ public class FloocraftWorldData extends WorldSavedData {
 	}
 
 	/**
-	 * reads in data from the CompoundNBT into this MapDataBase
+	 * reads in data from the CompoundTag into this MapDataBase
 	 *
 	 * @param nbt the compound to be read from
 	 */
 	@Override
-	public void read(CompoundNBT nbt) {
+	public void read(CompoundTag nbt) {
 		ListNBT ListNBT = nbt.getList(DataReference.MODID, 10);
 		for(int i = 0; i < ListNBT.size(); ++i)
 		{
-			CompoundNBT nbt1 = ListNBT.getCompound(i);
+			CompoundTag nbt1 = ListNBT.getCompound(i);
 			int[] coords = new int[]{nbt1.getInt("X"), nbt1.getInt("Y"), nbt1.getInt("Z")};
 			this.placeList.put(nbt1.getString("NAME"), coords);
 		}
@@ -47,10 +50,10 @@ public class FloocraftWorldData extends WorldSavedData {
 
 	@Override
 	@Nonnull
-	public CompoundNBT write(@Nonnull CompoundNBT compound) {
+	public CompoundTag write(@Nonnull CompoundTag compound) {
 		ListNBT ListNBT = new ListNBT();
 		for(String nextName : this.placeList.keySet()) {
-			CompoundNBT nbt1 = new CompoundNBT();
+			CompoundTag nbt1 = new CompoundTag();
 			nbt1.putString("NAME", nextName);
 			int[] coords = this.placeList.get(nextName);
 			nbt1.putInt("X", coords[0]);
@@ -64,8 +67,8 @@ public class FloocraftWorldData extends WorldSavedData {
 
 	public final ConcurrentHashMap<String, int[]> placeList = new ConcurrentHashMap<>();
 	
-	public static FloocraftWorldData forWorld(World world) {
-		ServerWorld serverWorld = world.getServer().getWorld(world.getDimensionKey());
+	public static FloocraftWorldData forLevel(Level level) {
+		ServerLevel serverWorld = level.getServer().getLevel(level.dimension());
 		DimensionSavedDataManager storage = serverWorld.getSavedData();
 		return storage.getOrCreate(FloocraftWorldData::new, DataReference.MODID);
 	}
@@ -98,27 +101,27 @@ public class FloocraftWorldData extends WorldSavedData {
 		markDirty();
 	}
 	
-	public MessageFireplaceList assembleNewFireplaceList(World w) {
+	public MessageFireplaceList assembleNewFireplaceList(Level l) {
 		MessageFireplaceList m = new MessageFireplaceList();
 		m.places = this.placeList.keySet().toArray();
-		boolean[] l = new boolean[m.places.length];
+		boolean[] list = new boolean[m.places.length];
 		int keyCount = 0;
 		FlooFlamesBase greenTemp = (FlooFlamesBase) FloocraftBase.GREEN_FLAMES_TEMP.get();
 		for(String nextName : this.placeList.keySet()) {
 			int[] coords = this.placeList.get(nextName);
             BlockPos dest = new BlockPos(coords[0], coords[1], coords[2]);
-			Block b = w.getBlockState(dest).getBlock();
+			BlockState state = l.getBlockState(dest);
             boolean ok;
-            if(b.isIn(BlockTags.FIRE)) {
-                ok = greenTemp.isInFireplace(w, dest) != null;
+            if(state.is(BlockTags.FIRE)) {
+                ok = greenTemp.isInFireplace(l, dest) != null;
             }
 			else {
-				ok = b instanceof FlooFlamesBase;
+				ok = state.getBlock() instanceof FlooFlamesBase;
 			}
-            l[keyCount] = ok;
+            list[keyCount] = ok;
 			++keyCount;
 		}
-		m.enabledList = l;
+		m.enabledList = list;
 		return m;
 	}
 }

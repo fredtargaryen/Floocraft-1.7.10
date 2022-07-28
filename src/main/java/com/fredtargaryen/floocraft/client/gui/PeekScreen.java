@@ -5,14 +5,13 @@ import com.fredtargaryen.floocraft.entity.PeekerEntity;
 import com.fredtargaryen.floocraft.network.MessageHandler;
 import com.fredtargaryen.floocraft.network.messages.MessageEndPeek;
 import com.fredtargaryen.floocraft.proxy.ClientProxy;
-import com.mojang.blaze3d.matrix.MatrixStack;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.button.Button;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.world.entity.Entity;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.common.MinecraftForge;
@@ -30,10 +29,12 @@ public class PeekScreen extends Screen {
     private UUID peekerID;
     private boolean peekFailedOutOfRange;
 
-    private static final TranslationTextComponent PEEK_DONE = new TranslationTextComponent("gui.peek.done");
+    private static final TranslatableComponent PEEK_DONE = new TranslatableComponent("gui.peek.done");
+    private static final TranslatableComponent OUT_OF_RANGE = new TranslatableComponent("gui.peek.outofrange");
+    private static final TranslatableComponent WAITING = new TranslatableComponent("gui.peek.waiting");
 
     public PeekScreen(String name, UUID peekerID) {
-        super(new StringTextComponent(name));
+        super(new TextComponent(name));
         this.peekerSpawned = false;
         this.fireplaceName = name;
         this.peekerID = peekerID;
@@ -45,26 +46,26 @@ public class PeekScreen extends Screen {
      * Adds the buttons (and other controls) to the screen in question.
      */
     public void init() {
-        this.buttons.clear();
-        this.minecraft.keyboardListener.enableRepeatEvents(true);
+        this.minecraft.keyboardHandler.setSendRepeatsToGui(true);
         if(!this.peekerSpawned) {
-            PeekerEntity ep = (PeekerEntity) FloocraftBase.proxy.getEntityWithUUID(this.minecraft.world, this.peekerID);
+            PeekerEntity ep = (PeekerEntity) FloocraftBase.proxy.getEntityWithUUID(this.minecraft.level, this.peekerID);
             if(ep == null) {
                 //Give up. TODO Maybe one day someone can add peeking into chunks outside the view distance?
                 this.peekFailedOutOfRange = true;
             }
             else {
                 this.peekerSpawned = true;
-                this.player = this.minecraft.getRenderViewEntity();
-                this.minecraft.setRenderViewEntity(ep);
+                this.player = this.minecraft.getCameraEntity();
+                this.minecraft.setCameraEntity(ep);
             }
         }
-        this.addButton(this.doneBtn = new Button(this.width / 2 - 100, this.height - 40, 200, 20, PEEK_DONE,
+        this.doneBtn = new Button(this.width / 2 - 100, this.height - 40, 200, 20, PEEK_DONE,
                 button -> {
                     PeekScreen.this.onClose();
-                    Minecraft.getInstance().displayGuiScreen(null);
-                }));
+                    Minecraft.getInstance().setScreen(null);
+                });
         this.doneBtn.active = true;
+        this.addRenderableWidget(this.doneBtn);
     }
 
     /**
@@ -72,10 +73,10 @@ public class PeekScreen extends Screen {
      */
     public void onClose() {
         ClientProxy proxy = (ClientProxy) FloocraftBase.proxy;
-        this.minecraft.keyboardListener.enableRepeatEvents(false);
+        this.minecraft.keyboardHandler.setSendRepeatsToGui(false);
         MinecraftForge.EVENT_BUS.unregister(this);
         proxy.overrideTicker.start();
-        this.minecraft.setRenderViewEntity(this.player);
+        this.minecraft.setCameraEntity(this.player);
         MessageEndPeek mep = new MessageEndPeek();
         mep.peekerUUID = this.peekerID;
         MessageHandler.INSTANCE.sendToServer(mep);
@@ -88,7 +89,7 @@ public class PeekScreen extends Screen {
     @Override
     public boolean charTyped(char par1, int par2) {
         if (par2 == 1) {
-            Minecraft.getInstance().displayGuiScreen(null);
+            Minecraft.getInstance().setScreen(null);
         }
         return true;
     }
@@ -98,13 +99,13 @@ public class PeekScreen extends Screen {
      */
     @Override
     @OnlyIn(Dist.CLIENT)
-    public void render(MatrixStack stack, int mousex, int mousey, float partialticks) {
+    public void render(PoseStack stack, int mousex, int mousey, float partialticks) {
         this.drawCenteredString(stack, this.font,
                 this.peekerSpawned ?
-                        I18n.format("gui.peek.peeking", this.fireplaceName) :// + " " + this.fireplaceName :
+                        new TranslatableComponent("gui.peek.peeking", this.fireplaceName) :
                         this.peekFailedOutOfRange ?
-                                I18n.format("gui.peek.outofrange") :
-                                I18n.format("gui.peek.waiting"),
+                                OUT_OF_RANGE :
+                                WAITING,
                 this.width / 2,
                 15,
                 16777215);
@@ -122,14 +123,14 @@ public class PeekScreen extends Screen {
     @SubscribeEvent
     public void onHurt(LivingHurtEvent lhe) {
         if(lhe.getEntity() == this.player) {
-            Minecraft.getInstance().displayGuiScreen(null);
+            Minecraft.getInstance().setScreen(null);
         }
     }
 
     @SubscribeEvent
     public void onDeath(LivingDeathEvent lde) {
         if(lde.getEntity() == this.player) {
-            Minecraft.getInstance().displayGuiScreen(null);
+            Minecraft.getInstance().setScreen(null);
         }
     }
 }

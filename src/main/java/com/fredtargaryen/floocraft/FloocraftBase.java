@@ -1,11 +1,13 @@
 package com.fredtargaryen.floocraft;
 
 import com.fredtargaryen.floocraft.block.*;
+import com.fredtargaryen.floocraft.blockentity.FlooSignBlockEntity;
+import com.fredtargaryen.floocraft.blockentity.FloowerPotBlockEntity;
 import com.fredtargaryen.floocraft.client.particle.GreenFlameParticle;
 import com.fredtargaryen.floocraft.command.CommandsBase;
 import com.fredtargaryen.floocraft.config.Config;
 import com.fredtargaryen.floocraft.entity.PeekerEntity;
-import com.fredtargaryen.floocraft.inventory.container.FloowerPotContainer;
+import com.fredtargaryen.floocraft.inventory.container.FloowerPotMenu;
 import com.fredtargaryen.floocraft.item.ItemFlooPowder;
 import com.fredtargaryen.floocraft.item.ItemFlooSign;
 import com.fredtargaryen.floocraft.item.ItemFlooTorch;
@@ -13,30 +15,29 @@ import com.fredtargaryen.floocraft.network.MessageHandler;
 import com.fredtargaryen.floocraft.proxy.ClientProxy;
 import com.fredtargaryen.floocraft.proxy.IProxy;
 import com.fredtargaryen.floocraft.proxy.ServerProxy;
-import com.fredtargaryen.floocraft.tileentity.FireplaceTileEntity;
-import com.fredtargaryen.floocraft.tileentity.FloowerPotTileEntity;
-import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.particles.ParticleType;
+import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.entity.EntityClassification;
-import net.minecraft.entity.EntityType;
 import net.minecraft.inventory.container.ContainerType;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroup;
-import net.minecraft.particles.BasicParticleType;
-import net.minecraft.particles.ParticleType;
-import net.minecraft.tileentity.TileEntityType;
-import net.minecraft.util.SoundEvent;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.client.event.ParticleFactoryRegisterEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.extensions.IForgeContainerType;
+import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.RegistryObject;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -45,6 +46,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLPaths;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.registries.RegistryObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -56,11 +58,11 @@ public class FloocraftBase {
 
     private static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, DataReference.MODID);
     private static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, DataReference.MODID);
-    private static final DeferredRegister<ContainerType<?>> CONTAINER_TYPES = DeferredRegister.create(ForgeRegistries.CONTAINERS, DataReference.MODID);
+    private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES = DeferredRegister.create(ForgeRegistries.BLOCK_ENTITIES, DataReference.MODID);
     private static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(ForgeRegistries.ENTITIES, DataReference.MODID);
+    private static final DeferredRegister<MenuType<?>> MENU_TYPES = DeferredRegister.create(ForgeRegistries.CONTAINERS, DataReference.MODID);
     private static final DeferredRegister<ParticleType<?>> PARTICLE_TYPES = DeferredRegister.create(ForgeRegistries.PARTICLE_TYPES, DataReference.MODID);
     private static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, DataReference.MODID);
-    private static final DeferredRegister<TileEntityType<?>> TILE_ENTITY_TYPES = DeferredRegister.create(ForgeRegistries.TILE_ENTITIES, DataReference.MODID);
     
     //Declare all blocks here
     public static final RegistryObject<Block> BLOCK_FLOO_TORCH = BLOCKS.register("flootorch", FlooTorchBlock::new);
@@ -81,20 +83,28 @@ public class FloocraftBase {
     public static final RegistryObject<Block> FLOO_SOUL_CAMPFIRE = BLOCKS.register("floo_soul_campfire", () -> new FlooCampfireBlock(10));
 
     public static final RegistryObject<Block> BLOCK_FLOO_SIGN = BLOCKS.register("floosign", FlooSignBlock::new);
-    public static final RegistryObject<Block> FLOOWER_POT = BLOCKS.register("floowerpot", BlockFloowerPot::new);
+    public static final RegistryObject<Block> BLOCK_FLOOWER_POT = BLOCKS.register("floowerpot", FloowerPotBlock::new);
 
     //Declare all items here
-    public static final RegistryObject<Item> ITEM_FLOO_SIGN = ITEMS.register("floosign", () -> new ItemFlooSign(new Item.Properties().group(ItemGroup.DECORATIONS).maxStackSize(16)));
+    public static final RegistryObject<Item> ITEM_FLOO_SIGN = ITEMS.register("floosign", ItemFlooSign::new);
     public static final RegistryObject<Item> ITEM_FLOO_TORCH = ITEMS.register("flootorch", ItemFlooTorch::new);
-    public static final RegistryObject<Item> ITEM_FLOOWER_POT = ITEMS.register("floowerpot", () -> new BlockItem(FLOOWER_POT.get(), new Item.Properties().group(ItemGroup.MISC)));
+    public static final RegistryObject<Item> ITEM_FLOOWER_POT = ITEMS.register("floowerpot", () -> new BlockItem(BLOCK_FLOOWER_POT.get(), new Item.Properties().tab(CreativeModeTab.TAB_MISC)));
     public static final RegistryObject<Item> ITEM_FLOO_POWDER_1 = ITEMS.register("floopowder_one", () -> new ItemFlooPowder((byte)1));
     public static final RegistryObject<Item> ITEM_FLOO_POWDER_2 = ITEMS.register("floopowder_two", () -> new ItemFlooPowder((byte)2));
     public static final RegistryObject<Item> ITEM_FLOO_POWDER_4 = ITEMS.register("floopowder_four", () -> new ItemFlooPowder((byte)4));
     public static final RegistryObject<Item> ITEM_FLOO_POWDER_8 = ITEMS.register("floopowder_eight", () -> new ItemFlooPowder((byte)8));
     public static final RegistryObject<Item> ITEM_FLOO_POWDER_INFINITE = ITEMS.register("floopowder_infinite", () -> new ItemFlooPowder((byte)9));;
 
-    //Declare containers here
-    public static final RegistryObject<ContainerType<FloowerPotContainer>> POT_CONTAINER_TYPE = CONTAINER_TYPES.register("pot", () -> IForgeContainerType.create((windowId, inv, data) -> new FloowerPotContainer(windowId, inv, inv.player.world, data.readBlockPos())));
+    //Declare BlockEntityTypes here
+    public static final RegistryObject<BlockEntityType<FlooSignBlockEntity>> FIREPLACE_TYPE = BLOCK_ENTITY_TYPES.register("fireplace", () ->
+            BlockEntityType.Builder.of(FlooSignBlockEntity::new, FloocraftBase.BLOCK_FLOO_SIGN.get())
+                    .build(null));
+    public static final RegistryObject<BlockEntityType<FloowerPotBlockEntity>> POT_TYPE = BLOCK_ENTITY_TYPES.register("pot", () ->
+            BlockEntityType.Builder.of(FloowerPotBlockEntity::new, FloocraftBase.BLOCK_FLOOWER_POT.get())
+                    .build(null));
+
+    //Declare menus here
+    public static final RegistryObject<MenuType<FloowerPotMenu>> POT_MENU_TYPE = MENU_TYPES.register("pot", () -> IForgeMenuType.create((windowId, inv, data) -> new FloowerPotMenu(windowId, inv, inv.player.level, data.readBlockPos())));
 
     //Declare EntityTypes here
     public static final RegistryObject<EntityType<PeekerEntity>> PEEKER_TYPE = ENTITY_TYPES.register("peeker", () ->
@@ -108,7 +118,7 @@ public class FloocraftBase {
                     .build(DataReference.MODID));
 
     //Declare ParticleTypes here
-    public static final RegistryObject<BasicParticleType> GREEN_FLAME = PARTICLE_TYPES.register("greenflame", () -> new BasicParticleType(false));
+    public static final RegistryObject<SimpleParticleType> GREEN_FLAME = PARTICLE_TYPES.register("greenflame", () -> new SimpleParticleType(false));
 
     //Declare sounds here
     /**
@@ -124,13 +134,7 @@ public class FloocraftBase {
      */
     public static final RegistryObject<SoundEvent> FLICK = SOUND_EVENTS.register("flick", () -> new SoundEvent(DataReference.FLICK_RL));
 
-    //Declare TileEntityTypes here
-    public static final RegistryObject<TileEntityType<FireplaceTileEntity>> FIREPLACE_TYPE = TILE_ENTITY_TYPES.register("fireplace", () ->
-            TileEntityType.Builder.create(FireplaceTileEntity::new, FloocraftBase.BLOCK_FLOO_SIGN.get())
-                    .build(null));
-    public static final RegistryObject<TileEntityType<FloowerPotTileEntity>> POT_TYPE = TILE_ENTITY_TYPES.register("pot", () ->
-            TileEntityType.Builder.create(FloowerPotTileEntity::new, FloocraftBase.FLOOWER_POT.get())
-                    .build(null));
+
 
     /**   
      * Says where the client and server 'proxy' code is loaded.
@@ -151,11 +155,11 @@ public class FloocraftBase {
         //Register all the RegistryObjects
         BLOCKS.register(loadingBus);
         ITEMS.register(loadingBus);
-        CONTAINER_TYPES.register(loadingBus);
+        BLOCK_ENTITY_TYPES.register(loadingBus);
         ENTITY_TYPES.register(loadingBus);
+        MENU_TYPES.register(loadingBus);
         PARTICLE_TYPES.register(loadingBus);
         SOUND_EVENTS.register(loadingBus);
-        TILE_ENTITY_TYPES.register(loadingBus);
 
         //Register the config
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_CONFIG_SPEC);
@@ -168,7 +172,7 @@ public class FloocraftBase {
 
     @SubscribeEvent
     public static void registerParticleFactories(ParticleFactoryRegisterEvent event) {
-        Minecraft.getInstance().particles.registerFactory(FloocraftBase.GREEN_FLAME.get(), GreenFlameParticle.Factory::new);
+        Minecraft.getInstance().particleEngine.register(FloocraftBase.GREEN_FLAME.get(), GreenFlameParticle.Factory::new);
     }
 
     /**
@@ -221,7 +225,7 @@ public class FloocraftBase {
                             trueMapping.remap(BLOCK_FLOO_SIGN.get());
                             break;
                         case "floowerpot":
-                            trueMapping.remap(FLOOWER_POT.get());
+                            trueMapping.remap(BLOCK_FLOOWER_POT.get());
                             break;
                         default:
                             break;
