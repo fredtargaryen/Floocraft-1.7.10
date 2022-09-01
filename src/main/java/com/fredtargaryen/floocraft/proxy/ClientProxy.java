@@ -1,32 +1,27 @@
 package com.fredtargaryen.floocraft.proxy;
 
-import com.fredtargaryen.floocraft.DataReference;
 import com.fredtargaryen.floocraft.FloocraftBase;
-import com.fredtargaryen.floocraft.blockentity.renderer.FlooSignRenderer;
-import com.fredtargaryen.floocraft.blockentity.renderer.FloowerPotRenderer;
 import com.fredtargaryen.floocraft.client.gui.Flash;
 import com.fredtargaryen.floocraft.client.gui.FlooSignScreen;
 import com.fredtargaryen.floocraft.client.gui.FloowerPotScreen;
 import com.fredtargaryen.floocraft.client.gui.TeleportScreen;
-import com.fredtargaryen.floocraft.client.renderer.PeekerRenderer;
 import com.fredtargaryen.floocraft.client.ticker.OverrideTicker;
 import com.fredtargaryen.floocraft.entity.PeekerEntity;
 import com.fredtargaryen.floocraft.network.messages.*;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ScreenManager;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.renderer.Atlases;
+import net.minecraft.client.gui.screens.MenuScreens;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.RenderTypeLookup;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.entity.Entity;
-import net.minecraft.world.World;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.client.registry.ClientRegistry;
-import net.minecraftforge.fml.client.registry.RenderingRegistry;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.Iterator;
@@ -39,7 +34,7 @@ public class ClientProxy implements IProxy {
 
     @Override
     public void onMessage(MessageApproval ma) {
-        Screen s = Minecraft.getInstance().currentScreen;
+        Screen s = Minecraft.getInstance().screen;
         if(s instanceof FlooSignScreen) {
             ((FlooSignScreen) s).dealWithAnswer(ma.answer);
         }
@@ -50,7 +45,7 @@ public class ClientProxy implements IProxy {
 
     @Override
     public void onMessage(MessageFireplaceList mfl) {
-        Screen s = Minecraft.getInstance().currentScreen;
+        Screen s = Minecraft.getInstance().screen;
         if(s instanceof TeleportScreen) {
             ((TeleportScreen) s).onFireplaceList(mfl);
         }
@@ -58,7 +53,7 @@ public class ClientProxy implements IProxy {
 
     @Override
     public void onMessage(MessageStartPeek msp) {
-        Screen s = Minecraft.getInstance().currentScreen;
+        Screen s = Minecraft.getInstance().screen;
         if(s instanceof TeleportScreen) {
             ((TeleportScreen) s).onStartPeek(msp);
         }
@@ -66,14 +61,7 @@ public class ClientProxy implements IProxy {
 
     @Override
     public void registerGUIs() {
-        ScreenManager.registerFactory(FloocraftBase.POT_MENU_TYPE.get(), FloowerPotScreen::new);
-    }
-
-    @Override
-    public void registerRenderers() {
-        ClientRegistry.bindBlockEntityRenderer(FloocraftBase.FIREPLACE_TYPE.get(), FlooSignRenderer::new);
-        ClientRegistry.bindBlockEntityRenderer(FloocraftBase.POT_TYPE.get(), FloowerPotRenderer::new);
-        RenderingRegistry.registerEntityRenderingHandler(FloocraftBase.PEEKER_TYPE.get(), PeekerRenderer::new);
+        MenuScreens.register(FloocraftBase.POT_MENU_TYPE.get(), FloowerPotScreen::new);
     }
 
     @Override
@@ -86,30 +74,31 @@ public class ClientProxy implements IProxy {
     @Override
     @OnlyIn(Dist.CLIENT)
     public void setUUIDs(MessagePlayerID message) {
-        PeekerEntity ep = (PeekerEntity) FloocraftBase.proxy.getEntityWithUUID(Minecraft.getInstance().world, message.peekerUUID);
+        PeekerEntity ep = (PeekerEntity) FloocraftBase.proxy.getEntityWithUUID(Minecraft.getInstance().level, message.peekerUUID);
         ep.setPlayerUUID(message.playerUUID);
     }
 
     @Override
     public void setupRenderTypes() {
-        RenderTypeLookup.setRenderLayer(FloocraftBase.GREEN_FLAMES_BUSY.get(), RenderType.getCutoutMipped());
-        RenderTypeLookup.setRenderLayer(FloocraftBase.GREEN_FLAMES_IDLE.get(), RenderType.getCutoutMipped());
-        RenderTypeLookup.setRenderLayer(FloocraftBase.GREEN_FLAMES_TEMP.get(), RenderType.getCutoutMipped());
-        RenderTypeLookup.setRenderLayer(FloocraftBase.MAGENTA_FLAMES_BUSY.get(), RenderType.getCutoutMipped());
-        RenderTypeLookup.setRenderLayer(FloocraftBase.MAGENTA_FLAMES_IDLE.get(), RenderType.getCutoutMipped());
-        RenderTypeLookup.setRenderLayer(FloocraftBase.MAGENTA_FLAMES_TEMP.get(), RenderType.getCutoutMipped());
-        RenderTypeLookup.setRenderLayer(FloocraftBase.FLOO_CAMPFIRE.get(), RenderType.getCutoutMipped());
-        RenderTypeLookup.setRenderLayer(FloocraftBase.FLOO_SOUL_CAMPFIRE.get(), RenderType.getCutoutMipped());
-        RenderTypeLookup.setRenderLayer(FloocraftBase.BLOCK_FLOO_TORCH.get(), RenderType.getCutoutMipped());
+        ItemBlockRenderTypes.setRenderLayer(FloocraftBase.GREEN_FLAMES_BUSY.get(), RenderType.cutoutMipped());
+        ItemBlockRenderTypes.setRenderLayer(FloocraftBase.GREEN_FLAMES_IDLE.get(), RenderType.cutoutMipped());
+        ItemBlockRenderTypes.setRenderLayer(FloocraftBase.GREEN_FLAMES_TEMP.get(), RenderType.cutoutMipped());
+        ItemBlockRenderTypes.setRenderLayer(FloocraftBase.MAGENTA_FLAMES_BUSY.get(), RenderType.cutoutMipped());
+        ItemBlockRenderTypes.setRenderLayer(FloocraftBase.MAGENTA_FLAMES_IDLE.get(), RenderType.cutoutMipped());
+        ItemBlockRenderTypes.setRenderLayer(FloocraftBase.MAGENTA_FLAMES_TEMP.get(), RenderType.cutoutMipped());
+        ItemBlockRenderTypes.setRenderLayer(FloocraftBase.FLOO_CAMPFIRE.get(), RenderType.cutoutMipped());
+        ItemBlockRenderTypes.setRenderLayer(FloocraftBase.FLOO_SOUL_CAMPFIRE.get(), RenderType.cutoutMipped());
+        ItemBlockRenderTypes.setRenderLayer(FloocraftBase.BLOCK_FLOO_TORCH.get(), RenderType.cutoutMipped());
     }
 
     @Override
-    public Entity getEntityWithUUID(World world, UUID uuid) {
-        if(world != null && uuid != null) {
-            Iterator<Entity> iterator = ((ClientWorld) world).getAllEntities().iterator();
+    public Entity getEntityWithUUID(Level level, UUID uuid) {
+        if(level != null && uuid != null) {
+
+            Iterator<Entity> iterator = level.getEntities(null, AABB.ofSize(Vec3.ZERO, 30000000, 30000000, 30000000)).iterator();
             while (iterator.hasNext()) {
                 Entity next = iterator.next();
-                if (next.getUniqueID().equals(uuid)) return next;
+                if (next.getUUID().equals(uuid)) return next;
             }
         }
         return null;
@@ -122,9 +111,11 @@ public class ClientProxy implements IProxy {
     @OnlyIn(Dist.CLIENT)
     public static void stitchTextures(TextureStitchEvent.Pre tse)
     {
-        if(tse.getMap().getTextureLocation().equals((Atlases.SIGN_ATLAS)))
-        {
-            tse.addSprite(DataReference.SIGN_TEX_LOC);
-        }
+        TextureAtlas ta = tse.getAtlas();
+        System.out.println("TODO");
+//        if(tse.getAtlas().location().equals( Atlases.SIGN_ATLAS))
+//        {
+//            tse.addSprite(DataReference.SIGN_TEX_LOC);
+//        }
     }
 }

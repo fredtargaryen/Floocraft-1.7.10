@@ -48,7 +48,7 @@ public class FlooSignRenderer implements BlockEntityRenderer<FlooSignBlockEntity
 
     public FlooSignRenderer(BlockEntityRendererProvider.Context context)
     {
-        this.model = new SignModel(context.bakeLayer(new ModelLayerLocation(new ResourceLocation(DataReference.MODID, "sign"), "main")));
+        this.model = new SignModel(context.bakeLayer(new ModelLayerLocation(new ResourceLocation(DataReference.MODID, "floosign"), "main")));
         this.font = context.getFont();
     }
 

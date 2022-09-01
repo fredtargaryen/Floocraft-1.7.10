@@ -3,7 +3,10 @@ package com.fredtargaryen.floocraft;
 import com.fredtargaryen.floocraft.block.*;
 import com.fredtargaryen.floocraft.blockentity.FlooSignBlockEntity;
 import com.fredtargaryen.floocraft.blockentity.FloowerPotBlockEntity;
+import com.fredtargaryen.floocraft.blockentity.renderer.FlooSignRenderer;
+import com.fredtargaryen.floocraft.blockentity.renderer.FloowerPotRenderer;
 import com.fredtargaryen.floocraft.client.particle.GreenFlameParticle;
+import com.fredtargaryen.floocraft.client.renderer.PeekerRenderer;
 import com.fredtargaryen.floocraft.command.CommandsBase;
 import com.fredtargaryen.floocraft.config.Config;
 import com.fredtargaryen.floocraft.entity.PeekerEntity;
@@ -18,19 +21,18 @@ import com.fredtargaryen.floocraft.proxy.ServerProxy;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
-import net.minecraft.entity.EntityClassification;
-import net.minecraft.inventory.container.ContainerType;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.client.event.ParticleFactoryRegisterEvent;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.common.extensions.IForgeContainerType;
 import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.RegistryEvent;
@@ -108,12 +110,12 @@ public class FloocraftBase {
 
     //Declare EntityTypes here
     public static final RegistryObject<EntityType<PeekerEntity>> PEEKER_TYPE = ENTITY_TYPES.register("peeker", () ->
-            EntityType.Builder.<PeekerEntity>create((type, world) -> new PeekerEntity(world), EntityClassification.MISC)
+            EntityType.Builder.<PeekerEntity>of((type, world) -> new PeekerEntity(world), MobCategory.MISC)
                     .setTrackingRange(32)
                     .setUpdateInterval(10)
                     .setShouldReceiveVelocityUpdates(false)
-                    .immuneToFire()
-                    .size(0.5F, 0.5F)
+                    .fireImmune()
+                    .sized(0.5F, 0.5F)
                     .setCustomClientFactory((spawnEntity, world) -> new PeekerEntity(world))
                     .build(DataReference.MODID));
 
@@ -171,8 +173,15 @@ public class FloocraftBase {
     }
 
     @SubscribeEvent
+    public static void registerRenderers(EntityRenderersEvent.RegisterRenderers rr) {
+        rr.registerBlockEntityRenderer(FloocraftBase.FIREPLACE_TYPE.get(), FlooSignRenderer::new);
+        rr.registerBlockEntityRenderer(FloocraftBase.POT_TYPE.get(), FloowerPotRenderer::new);
+        rr.registerEntityRenderer(FloocraftBase.PEEKER_TYPE.get(), PeekerRenderer::new);
+    }
+
+    @SubscribeEvent
     public static void registerParticleFactories(ParticleFactoryRegisterEvent event) {
-        Minecraft.getInstance().particleEngine.register(FloocraftBase.GREEN_FLAME.get(), GreenFlameParticle.Factory::new);
+        Minecraft.getInstance().particleEngine.register(FloocraftBase.GREEN_FLAME.get(), GreenFlameParticle.Provider::new);
     }
 
     /**
@@ -194,7 +203,6 @@ public class FloocraftBase {
 
     public void clientSetup(FMLClientSetupEvent event) {
         proxy.registerGUIs();
-        proxy.registerRenderers();
         proxy.setupRenderTypes();
     }
 

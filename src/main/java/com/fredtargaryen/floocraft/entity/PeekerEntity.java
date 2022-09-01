@@ -4,30 +4,21 @@ import com.fredtargaryen.floocraft.FloocraftBase;
 import com.fredtargaryen.floocraft.network.MessageHandler;
 import com.fredtargaryen.floocraft.network.messages.MessageEndPeek;
 import com.fredtargaryen.floocraft.network.messages.MessagePlayerIDRequest;
-import net.minecraft.client.entity.player.AbstractClientPlayerEntity;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.IPacket;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.Direction;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.server.ServerWorld;
-import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.network.NetworkHooks;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 public class PeekerEntity extends Entity {
@@ -66,8 +57,8 @@ public class PeekerEntity extends Entity {
                 x += 0.5;
                 break;
         }
-        this.playerUUID = player.getUniqueID();
-        this.setLocationAndAngles(x, y, z, this.getYawFromDirection(direction), 0.0F);
+        this.playerUUID = player.getUUID();
+        this.absMoveTo(x, y, z, this.getYawFromDirection(direction), 0.0F);
     }
 
     public void setPlayerUUID(UUID uuid) {
@@ -75,22 +66,22 @@ public class PeekerEntity extends Entity {
     }
 
     private float getYawFromDirection(Direction ef) {
-        switch (ef) {
-            case NORTH:
-                return 180.0F;
-            case EAST:
-                return -90.0F;
-            case SOUTH:
-                return 0.0F;
-            default:
-                return 90.0F;
-        }
+        return switch (ef) {
+            case NORTH -> 180.0F;
+            case EAST -> -90.0F;
+            case SOUTH -> 0.0F;
+            default -> 90.0F;
+        };
     }
 
     @Override
-    public void remove() {
-        super.remove();
+    public void remove(RemovalReason reason) {
+        super.remove(reason);
         MinecraftForge.EVENT_BUS.unregister(this);
+    }
+
+    @Override
+    protected void defineSynchedData() {
     }
 
     /**
@@ -100,9 +91,9 @@ public class PeekerEntity extends Entity {
     @Override
     public void tick() {
         if (!this.level.isClientSide) {
-            Player player = (Player) ((ServerLevel)this.level).getEntityByUuid(this.playerUUID);
+            Player player = this.level.getPlayerByUUID(this.playerUUID);
             if (player == null || !player.isAlive()) {
-                this.remove();
+                this.remove(RemovalReason.DISCARDED);
             }
         }
     }
@@ -113,27 +104,27 @@ public class PeekerEntity extends Entity {
                 //Client; needs to send one request message. PlayerUUID will be set by MessagePlayerID
                 if (!this.sentRequest) {
                     MessagePlayerIDRequest mpidr = new MessagePlayerIDRequest();
-                    mpidr.peekerUUID = this.getUniqueID();
+                    mpidr.peekerUUID = this.getUUID();
                     MessageHandler.INSTANCE.sendToServer(mpidr);
                 }
             }
             return null;
         }
         if (this.texture == null && this.level.isClientSide) {
-            AbstractClientPlayerEntity acpe = (AbstractClientPlayerEntity) this.world.getPlayerByUuid(this.playerUUID);
+            AbstractClientPlayer acp = (AbstractClientPlayer) this.level.getPlayerByUUID(this.playerUUID);
             // If we can't find the player with this UUID they probably don't exist now, so we shouldn't render their peeker
-            this.texture = acpe == null ? null : acpe.getLocationSkin();
+            this.texture = acp == null ? null : acp.getSkinTextureLocation();
         }
         return this.texture;
     }
 
     @SubscribeEvent
     public void onHurt(LivingHurtEvent lhe) {
-        if (this.level != null && this.level.isClientSide && this.playerUUID != null) {
-            UUID hurtEntityUUID = lhe.getEntity().getUniqueID();
+        if (this.level.isClientSide && this.playerUUID != null) {
+            UUID hurtEntityUUID = lhe.getEntity().getUUID();
             if(hurtEntityUUID.equals(this.playerUUID)) {
                 MessageEndPeek mep = new MessageEndPeek();
-                mep.peekerUUID = this.getUniqueID();
+                mep.peekerUUID = this.getUUID();
                 MessageHandler.INSTANCE.sendToServer(mep);
             }
         }
@@ -141,45 +132,28 @@ public class PeekerEntity extends Entity {
 
     @SubscribeEvent
     public void onDeath(LivingDeathEvent lde) {
-        if (this.level != null && this.level.isClientSide && this.playerUUID != null && lde.getEntity().getUniqueID().equals(this.playerUUID)) {
+        if (this.level.isClientSide && this.playerUUID != null && lde.getEntity().getUUID().equals(this.playerUUID)) {
             MessageEndPeek mep = new MessageEndPeek();
-            mep.peekerUUID = this.getUniqueID();
+            mep.peekerUUID = this.getUUID();
             MessageHandler.INSTANCE.sendToServer(mep);
         }
     }
 
     @Override
-    protected void registerData() {
-
-    }
-
-    /**
-     * (abstract) Protected helper method to read subclass entity data from NBT.
-     *
-     * @param compound
-     */
-    @Override
-    protected void readAdditional(CompoundTag compound) {
+    protected void readAdditionalSaveData(CompoundTag compound) {
         this.playerUUID = new UUID(compound.getLong("msb"), compound.getLong("lsb"));
-        this.setRotation(compound.getFloat("yaw"), 0.0F);
+        this.setRot(compound.getFloat("yaw"), 0.0F);
     }
 
-    /**
-     * Writes the extra NBT data specific to this type of entity. Should <em>not</em> be called from outside this class;
-     * use {@link #writeUnlessPassenger} or {@link #writeWithoutTypeId} instead.
-     *
-     * @param compound the compound to be written into
-     */
     @Override
-    protected void writeAdditional(CompoundTag compound) {
+    protected void addAdditionalSaveData(CompoundTag compound) {
         compound.putLong("msb", this.playerUUID.getMostSignificantBits());
         compound.putLong("lsb", this.playerUUID.getLeastSignificantBits());
-        compound.putFloat("yaw", this.rotationYaw);
+        compound.putFloat("yaw", this.getYRot());
     }
 
     @Override
-    @Nonnull
-    public IPacket<?> createSpawnPacket() {
-        return NetworkHooks.getEntitySpawningPacket(this);
+    public Packet<?> getAddEntityPacket() {
+        return new ClientboundAddEntityPacket(this);
     }
 }

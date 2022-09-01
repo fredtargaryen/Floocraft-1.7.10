@@ -12,7 +12,6 @@ public interface IProxy {
     void onMessage(MessageFireplaceList mfl);
     void onMessage(MessageStartPeek msp);
     void registerGUIs();
-    void registerRenderers();
     void registerTickHandlers();
     void setUUIDs(MessagePlayerID message);
     void setupRenderTypes();

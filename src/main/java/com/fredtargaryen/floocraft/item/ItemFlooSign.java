@@ -20,8 +20,9 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import javax.annotation.Nonnull;
 
 public class ItemFlooSign extends Item {
-	public ItemFlooSign(Item.Properties p) {
-        super(p.tab(CreativeModeTab.TAB_DECORATIONS).stacksTo(16));
+
+	public ItemFlooSign() {
+        super(new Item.Properties().tab(CreativeModeTab.TAB_DECORATIONS).stacksTo(16));
     }
 
     @Override

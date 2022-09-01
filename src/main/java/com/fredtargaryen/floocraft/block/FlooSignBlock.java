@@ -31,7 +31,7 @@ public class FlooSignBlock extends WallSignBlock implements EntityBlock {
     @Override
 	public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         try {
-            return new FlooSignBlockEntity();
+            return new FlooSignBlockEntity(pos, state);
         }
         catch (Exception exception) {
             throw new RuntimeException(exception);

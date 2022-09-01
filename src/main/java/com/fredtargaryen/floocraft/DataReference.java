@@ -25,6 +25,7 @@ import net.minecraft.world.level.block.Block;
 
 public class DataReference {
     public static final String MODID = "floocraftft";
+    public static final String DATA_FILE_NAME = MODID + ".dat";
 
     public static final int FLOO_FIRE_DETECTION_RANGE = 8;
 

@@ -4,54 +4,43 @@ import com.fredtargaryen.floocraft.DataReference;
 import com.fredtargaryen.floocraft.FloocraftBase;
 import com.fredtargaryen.floocraft.block.FlooFlamesBase;
 import com.fredtargaryen.floocraft.network.messages.MessageFireplaceList;
-import net.minecraft.block.Block;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListNBT;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.server.ServerWorld;
-import net.minecraft.world.World;
-import net.minecraft.world.storage.DimensionSavedDataManager;
-import net.minecraft.world.storage.WorldSavedData;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.storage.DimensionDataStorage;
 
 import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class FloocraftWorldData extends WorldSavedData {
-	/**
-	 * Code inspection will tell you the access can be private, but it jolly well can't
-	 */
-	public FloocraftWorldData()
-	{
-		super(DataReference.MODID);
-	}
+public class FloocraftWorldData extends SavedData {
 
-	/**
-	 * reads in data from the CompoundTag into this MapDataBase
-	 *
-	 * @param nbt the compound to be read from
-	 */
-	@Override
-	public void read(CompoundTag nbt) {
-		ListNBT ListNBT = nbt.getList(DataReference.MODID, 10);
-		for(int i = 0; i < ListNBT.size(); ++i)
+	public final ConcurrentHashMap<String, int[]> placeList = new ConcurrentHashMap<>();
+
+	public FloocraftWorldData() {}
+
+	public static FloocraftWorldData load(CompoundTag nbt) {
+		FloocraftWorldData data = new FloocraftWorldData();
+		ListTag list = nbt.getList(DataReference.MODID, 10);
+		for(int i = 0; i < list.size(); ++i)
 		{
-			CompoundTag nbt1 = ListNBT.getCompound(i);
+			CompoundTag nbt1 = list.getCompound(i);
 			int[] coords = new int[]{nbt1.getInt("X"), nbt1.getInt("Y"), nbt1.getInt("Z")};
-			this.placeList.put(nbt1.getString("NAME"), coords);
+			data.placeList.put(nbt1.getString("NAME"), coords);
 		}
+		return data;
 	}
 
 	@Override
 	@Nonnull
-	public CompoundTag write(@Nonnull CompoundTag compound) {
-		ListNBT ListNBT = new ListNBT();
+	public CompoundTag save(@Nonnull CompoundTag compound) {
+		ListTag list = new ListTag();
 		for(String nextName : this.placeList.keySet()) {
 			CompoundTag nbt1 = new CompoundTag();
 			nbt1.putString("NAME", nextName);
@@ -59,24 +48,22 @@ public class FloocraftWorldData extends WorldSavedData {
 			nbt1.putInt("X", coords[0]);
 			nbt1.putInt("Y", coords[1]);
 			nbt1.putInt("Z", coords[2]);
-			ListNBT.add(nbt1);
+			list.add(nbt1);
 		}
-		compound.put(DataReference.MODID, ListNBT);
+		compound.put(DataReference.MODID, list);
 		return compound;
 	}
-
-	public final ConcurrentHashMap<String, int[]> placeList = new ConcurrentHashMap<>();
 	
 	public static FloocraftWorldData forLevel(Level level) {
 		ServerLevel serverWorld = level.getServer().getLevel(level.dimension());
-		DimensionSavedDataManager storage = serverWorld.getSavedData();
-		return storage.getOrCreate(FloocraftWorldData::new, DataReference.MODID);
+		DimensionDataStorage storage = serverWorld.getDataStorage();
+		return storage.computeIfAbsent(FloocraftWorldData::load, FloocraftWorldData::new, DataReference.DATA_FILE_NAME);
 	}
 
 	public void addLocation(String name, BlockPos pos) {
 		placeList.put(name, new int[]{pos.getX(), pos.getY(), pos.getZ()});
 		FloocraftBase.info("[FLOOCRAFT-SERVER] Added fireplace at " + pos.toString() + ". Name: " + name);
-		markDirty();
+		this.setDirty();
 	}
 	
 	public void removeLocation(int x, int y, int z) {
@@ -98,7 +85,7 @@ public class FloocraftWorldData extends WorldSavedData {
             FloocraftBase.warn("[FLOOCRAFT-SERVER] Failed to remove fireplace at (" + x + ", " + y + ", " + z + ").");
 			FloocraftBase.warn("[FLOOCRAFT-SERVER] Data can be manually removed with an NBT editor.");
 		}
-		markDirty();
+		this.setDirty();
 	}
 	
 	public MessageFireplaceList assembleNewFireplaceList(Level l) {

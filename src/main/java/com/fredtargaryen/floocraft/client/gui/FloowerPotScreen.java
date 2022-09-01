@@ -9,8 +9,10 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.MenuAccess;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
@@ -19,7 +21,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
 @OnlyIn(Dist.CLIENT)
-public class FloowerPotScreen<T extends FloowerPotMenu> extends AbstractContainerScreen<T> {
+public class FloowerPotScreen extends AbstractContainerScreen<FloowerPotMenu> implements MenuAccess<FloowerPotMenu> {
     private Button hLess;
     private Button hMore;
     private Button vLess;
@@ -32,8 +34,8 @@ public class FloowerPotScreen<T extends FloowerPotMenu> extends AbstractContaine
     private static final TextComponent PLUS = new TextComponent("+");
     private ResourceLocation MENU_LOCATION = new ResourceLocation(DataReference.MODID, "textures/gui/guifloowerpot.png");
 
-    public FloowerPotScreen(T menu, Inventory inv, TextComponent itc) {
-        super(menu, inv, itc);
+    public FloowerPotScreen(FloowerPotMenu menu, Inventory inv, Component comp) {
+        super(menu, inv, comp);
         this.fpbe = (FloowerPotBlockEntity) menu.getBlockEntity();
         this.hRangeCache = DataReference.POT_MIN_H_RANGE;
         this.vRangeCache = DataReference.POT_MIN_V_RANGE;

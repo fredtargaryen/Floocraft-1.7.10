@@ -3,6 +3,7 @@ package com.fredtargaryen.floocraft.network.messages;
 import com.fredtargaryen.floocraft.entity.PeekerEntity;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.UUID;
@@ -16,7 +17,7 @@ public class MessageEndPeek {
             ServerLevel sw = ctx.get().getSender().getLevel();
             if(message.peekerUUID != null) {
                 PeekerEntity pe = (PeekerEntity) sw.getEntity(message.peekerUUID);
-                if (pe != null) pe.remove();
+                if (pe != null) pe.remove(Entity.RemovalReason.DISCARDED);
             }
         });
         ctx.get().setPacketHandled(true);

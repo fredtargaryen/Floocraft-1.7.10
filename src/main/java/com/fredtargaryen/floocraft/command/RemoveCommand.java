@@ -41,7 +41,7 @@ public class RemoveCommand {
         }
         if(placesFound)
         {
-            fwd.markDirty();
+            fwd.setDirty();
         }
         else
         {
